@@ -9,8 +9,8 @@ In present state, MAV.ini contains some test values, and the software is not ful
 * TODO: allow user to set min/max values and multipliers for display formatting
 * TODO: create an interface for sending messages (like toggling relays)
 
-<br>
----
+
+<br><hr>
 <sup>Copyright (c) 2020 -- Yuri
 <br><br>
 Permission is hereby granted, free of charge, to any person obtaining a copy
