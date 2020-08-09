@@ -1,11 +1,9 @@
 from pymavlink import mavutil
 from maximum_roverdrive.tablemodel import TableModel
-from PyQt5.QtWidgets import QTableView
 from threading import Thread
 
 
 class MavMonitor:
-    # _tableView = QTableView()
 
     def __init__(self, port=None, tableView=None, cfg_messages=None):
         if port is None or tableView is None or cfg_messages is None:
@@ -35,7 +33,7 @@ class MavMonitor:
         data = []
         for msg in self._messages:
             data.append([msg, 'NO DATA'])
-        self._model = TableModel(data)
+        self._model = TableModel(data, self._messages)
         self._tableView.setModel(self._model)
         self._tableView.resizeColumnsToContents()
 
@@ -54,6 +52,7 @@ class MavMonitor:
             for row in range(self._model.rowCount()):
                 index = self._model.index(row, 0)
                 msg_types.append(self._model.data(index).split('.')[0])
+            # TODO: wait for any message and update a static dictionary with current data
             self._connection.recv_match(type=msg_types, blocking=True, timeout=0.2)
             self.__update_table()
         self._isalive = False
@@ -62,7 +61,8 @@ class MavMonitor:
         self._keepalive = True
         Thread(target=self.__update_thread, daemon=True).start()
 
-    def add_msg(self, msg, attr):
+    def add_msg(self, msg, attr, multiplier=1.0, low=0.0, high=0.0):
+        self._model.updateDataParameters(msg + '.' + attr, multiplier, low, high)
         self._model.appendRow([msg + '.' + attr, 'NO DATA'])
         self._tableView.resizeColumnsToContents()
 

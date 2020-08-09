@@ -1,14 +1,17 @@
 # MaximumRoverdrive
 
-Uses pymavlink to select and monitor MAVlink messages of interest and display them in a "sticky" window.
+Uses pymavlink to monitor selected MAVlink messages and display them in a "sticky" window with a familiar theme.
 
 In present state, MAV.ini contains some test values, and the software is not fully functional, though it does provide near real-time display of message data as defined in MAV.ini.
 
-* TODO: finish config file IO
-* TODO: allow user selectable messages (instead of test input)
-* TODO: allow user to set min/max values and multipliers for display formatting
-* TODO: create an interface for sending messages (like toggling relays)
+- [ ] TODO: finish config file IO
+- [ ] TODO: allow user selectable messages (instead of test input)
+- [ ] TODO: allow user to set min/max values and multipliers for display formatting
+- [ ] TODO: create an interface for sending messages (like toggling relays)
 
+Requires: pymavlink, PyQt5, configparser
+
+_Should_ be cross-platform compatible, however only tested on Windows 10 in a Python 3.7 environment.
 
 <br><hr>
 <sup>Copyright (c) 2020 -- Yuri

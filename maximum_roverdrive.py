@@ -1,16 +1,18 @@
-import sys
+from sys import argv
 from maximum_roverdrive.config_io import ConfigIO
 from maximum_roverdrive.mavmonitor import MavMonitor
 from maximum_roverdrive.qappmplookandfeel import QAppMPLookAndFeel
 from maximum_roverdrive.tablemodel import TableModel
 from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QComboBox, QLabel, QPushButton, QTableView
+from PyQt5.QtWidgets import QWidget, QAction, QVBoxLayout, QComboBox, QLabel, QPushButton, QTableView
 
 
 class MainWindow(QWidget):
 
     def __init__(self):
         super(MainWindow, self).__init__()
+        finish = QAction("Quit", self)
+        finish.triggered.connect(self.closeEvent)
         self.cfg = ConfigIO()
         self.monitor = MavMonitor()
         self.model = TableModel()
@@ -45,8 +47,16 @@ class MainWindow(QWidget):
 
     @pyqtSlot()
     def add_msg(self):
-        self.monitor.add_msg('MISSION_CURRENT', 'seq')
-        self.monitor.add_msg('NAV_CONTROLLER_OUTPUT', 'nav_bearing')
+        msg = 'MISSION_CURRENT'
+        attr = 'seq'
+        if msg + '.' + attr not in self.cfg.messages.keys():
+            self.monitor.add_msg(msg, attr, 1.0, 15.0, 69.0)
+            self.cfg.add_msg(msg, attr, 1.0, 15.0, 69.0)
+        msg = 'NAV_CONTROLLER_OUTPUT'
+        attr = 'nav_bearing'
+        if msg + '.' + attr not in self.cfg.messages.keys():
+            self.monitor.add_msg(msg, attr, 1.0, 15.0, 69.0)
+            self.cfg.add_msg(msg, attr, 1.0, 15.0, 69.0)
         # TODO: update config file sections
         # TODO: select from a list of available messages
 
@@ -70,15 +80,20 @@ class MainWindow(QWidget):
         else:
             self.mav_disconnect()
 
+    @pyqtSlot(bool)
+    def closeEvent(self, event):
+        if self.con_button.text() == "Disconnect":
+            self.mav_disconnect()
+
     def mav_disconnect(self):
+        self.monitor.disconnect()
         self.con_button.setText('Connect')
         self.con_text.setEnabled(True)
-        self.monitor.disconnect()
         self.status_label.setText('Disconnected')
 
 
 def main():
-    app = QAppMPLookAndFeel(sys.argv)
+    app = QAppMPLookAndFeel(argv)
     window = MainWindow()
     window.show()
     app.exec()

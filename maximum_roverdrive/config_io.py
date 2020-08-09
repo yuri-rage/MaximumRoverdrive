@@ -1,10 +1,12 @@
-from configparser import SafeConfigParser
+from sys import float_info
+from configparser import ConfigParser, NoOptionError
+from collections import namedtuple
 
 
 class ConfigIO:
     def __init__(self, filename=''):
         self.filename = {True: 'MAV.ini', False: filename}[len(filename) == 0]
-        self.parser = SafeConfigParser()
+        self.parser = ConfigParser()
         self.parser.optionxform = str  # preserve case
         self.parser.read(self.filename)
         self.__check()
@@ -33,12 +35,13 @@ class ConfigIO:
             self.parser.set('ports', str(lst.index(prt)), prt)
         self.save()
 
-    def save_msg_config(self, messages):
-        for section in self.parser.sections():
-            if not section == 'ports':
-                self.parser.remove_section(section)
-        for msg in messages:
-            self.parser.add_section(msg[0])  # TODO: pass and save message options (thresholds, multiplier, etc)
+    def add_msg(self, msg, attr, multiplier=1.0, low=0.0, high=0.0):
+        section = msg + '.' + attr
+        if section not in self.messages.keys():
+            self.parser.add_section(section)
+        self.parser.set(section, 'multiplier', str(multiplier))
+        self.parser.set(section, 'low', str(low))
+        self.parser.set(section, 'high', str(high))
         self.save()
 
     def save(self):
@@ -51,9 +54,30 @@ class ConfigIO:
         return self.__values('ports')
 
     @property
+    def legacy_messages(self):  # TODO: delete this if the new one works
+        sections = self.parser.sections()
+        sections.remove('ports')
+        return sections
+
+    @property
     def messages(self):
-        lst = self.parser.sections()
-        lst.remove('ports')
-        return lst
-
-
+        MsgParams = namedtuple('MsgParams', 'multiplier low high')
+        value = {}
+        params = MsgParams(0, 0, 0)
+        sections = self.parser.sections()
+        sections.remove('ports')
+        for section in sections:
+            try:
+                params = params._replace(multiplier=self.parser.getfloat(section, 'multiplier'))
+            except NoOptionError:
+                params = params._replace(multiplier=1.0)
+            try:
+                params = params._replace(low=self.parser.getfloat(section, 'low'))
+            except NoOptionError:
+                params = params._replace(low=float_info.max * -1.0)
+            try:
+                params = params._replace(high=self.parser.getfloat(section, 'high'))
+            except NoOptionError:
+                params = params._replace(high=float_info.max)
+            value.update({section: params})
+        return value
