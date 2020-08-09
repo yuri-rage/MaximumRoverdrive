@@ -1,12 +1,24 @@
 from sys import float_info
 from configparser import ConfigParser, NoOptionError
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 
 class ConfigIO:
+    _usage_str = '# MAV.ini for MaximumRoverdrive\n\n'\
+                  '# ports:\n'\
+                  '#     network: [protocol:]address[:port] (e.g., tcp:localhost:5760 or udp:127.0.0.1:14550)\n'\
+                  '#     serial : port (e.g., com14 or /dev/ttyUSB0)\n\n'\
+                  '# messages:\n'\
+                  '#     each section specifies a message to monitor\n'\
+                  '#     the format is [MESSAGE.attribute] (e.g., [VFR_HUD.yaw] or [GPS_RAW_INT.fix_type])\n'\
+                  '#     options are indeed optional, <float> is a decimal value (e.g., 0.0 or 100.0):\n'\
+                  '#         multiplier = <float>  -- displayed value will be multiplied by this value\n'\
+                  '#         low = <float>         -- low threshold - displayed value turns red below this\n'\
+                  '#         high = <float>        -- high threshold - displayed value turns red above this'
+
     def __init__(self, filename=''):
         self.filename = {True: 'MAV.ini', False: filename}[len(filename) == 0]
-        self.parser = ConfigParser()
+        self.parser = ConfigParser(allow_no_value=True)
         self.parser.optionxform = str  # preserve case
         self.parser.read(self.filename)
         self.__check()
@@ -14,6 +26,10 @@ class ConfigIO:
     def __check(self):
         if not self.parser.has_section('ports'):
             self.parser.add_section('ports')
+        # really stupid workaround for the fact that configparser won't save comments
+        if not self.parser.has_section('usage'):
+            self.parser.add_section('usage')
+        self.parser.set('usage', self._usage_str, None)
         self.save()
 
     def __values(self, section):
@@ -51,6 +67,10 @@ class ConfigIO:
         self.save()
 
     def save(self):
+        # really stupid workaround to account for the fact that configparser doesn't keep section order
+        ordered_sections = OrderedDict([(k, None) for k in ['usage', 'ports'] if k in self.parser._sections])
+        ordered_sections.update(self.parser._sections)
+        self.parser._sections = ordered_sections
         f = open(self.filename, "w")
         self.parser.write(f)
         f.close()
@@ -60,18 +80,13 @@ class ConfigIO:
         return self.__values('ports')
 
     @property
-    def legacy_messages(self):  # TODO: delete this if the new one works
-        sections = self.parser.sections()
-        sections.remove('ports')
-        return sections
-
-    @property
     def messages(self):
         MsgParams = namedtuple('MsgParams', 'multiplier low high')
         value = {}
         params = MsgParams(0, 0, 0)
         sections = self.parser.sections()
         sections.remove('ports')
+        sections.remove('usage')
         for section in sections:
             try:
                 params = params._replace(multiplier=self.parser.getfloat(section, 'multiplier'))
