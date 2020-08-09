@@ -4,11 +4,12 @@ Uses pymavlink to monitor selected MAVlink messages and display them in a "stick
 
 In present state, MAV.ini contains some test values, and the software is not fully functional, though it does provide near real-time display of message data as defined in MAV.ini.
 
-- [ ] TODO: finish config file IO (almost complete - need "remove" functionality)
-- [ ] TODO: allow user selectable messages (instead of test input)
-- [x] TODO: ~~allow user to set min/max values and multipliers for display formatting~~
+- [ ] TODO: make the UI layout less clunky
 - [ ] TODO: create an interface for sending messages (like toggling relays)
-- [ ] TODO: more efficient MAVlink message collection
+- [x] TODO: ~~finish config file IO (almost complete - need "remove" functionality)~~
+- [x] TODO: ~~allow user selectable messages (instead of test input)~~
+- [x] TODO: ~~allow user to set min/max values and multipliers for display formatting~~
+- [x] TODO: ~~more efficient MAVlink message collection~~
 
 Requires: pymavlink, PyQt5, configparser
 

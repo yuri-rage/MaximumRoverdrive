@@ -44,6 +44,12 @@ class ConfigIO:
         self.parser.set(section, 'high', str(high))
         self.save()
 
+    def del_msg(self, msg, attr):
+        section = msg + '.' + attr
+        if section in self.messages.keys():
+            self.parser.remove_section(section)
+        self.save()
+
     def save(self):
         f = open(self.filename, "w")
         self.parser.write(f)

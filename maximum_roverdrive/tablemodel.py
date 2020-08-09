@@ -2,6 +2,7 @@ from collections import namedtuple
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, pyqtSignal, pyqtSlot
 from PyQt5.QtGui import QBrush, QColor
 
+
 class TableModel(QAbstractTableModel):
     dataChangedThreaded = pyqtSignal(QModelIndex, QModelIndex)
     layoutChangedThreaded = pyqtSignal()
@@ -16,7 +17,6 @@ class TableModel(QAbstractTableModel):
             self.dataChangedThreaded.connect(self._dataChangedThreaded)
             self.layoutChangedThreaded.connect(self._layoutChangedThreaded)
 
-    # TODO: turn this into a dictionary of named tuples with multipliers and threshold values
     def updateDataParameters(self, msg, multiplier, low, high):
         MsgParams = namedtuple('MsgParams', 'multiplier low high')
         self._dataParameters.update({msg: MsgParams(multiplier, low, high)})
@@ -26,6 +26,8 @@ class TableModel(QAbstractTableModel):
             return self._data[index.row()][index.column()]
         if role == Qt.BackgroundRole and index.column() == 1:
             msg = self._data[index.row()][0]
+            if msg == 'NO DATA':
+                return QBrush(Qt.darkMagenta)
             try:
                 val = float(self._data[index.row()][index.column()])
             except ValueError:

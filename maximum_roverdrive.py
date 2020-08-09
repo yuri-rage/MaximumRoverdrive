@@ -1,82 +1,94 @@
-from sys import argv
+import sys
+from sys import argv, float_info
 from maximum_roverdrive.config_io import ConfigIO
 from maximum_roverdrive.mavmonitor import MavMonitor
 from maximum_roverdrive.qappmplookandfeel import QAppMPLookAndFeel
-from maximum_roverdrive.tablemodel import TableModel
-from PyQt5.QtCore import Qt, pyqtSlot
-from PyQt5.QtWidgets import QWidget, QAction, QVBoxLayout, QComboBox, QLabel, QPushButton, QTableView
+from maximum_roverdrive.main_window import MainWindow
+from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtWidgets import QAction
 
 
-class MainWindow(QWidget):
+class MaximumRoverdrive(MainWindow):
 
     def __init__(self):
-        super(MainWindow, self).__init__()
+        super(MaximumRoverdrive, self).__init__()
         finish = QAction("Quit", self)
         finish.triggered.connect(self.closeEvent)
         self.cfg = ConfigIO()
-        self.monitor = MavMonitor()
-        self.model = TableModel()
-        self.layout = QVBoxLayout()
-        self.con_text = QComboBox()
-        self.con_button = QPushButton('Connect')
-        self.add_button = QPushButton('Add')
-        self.remove_button = QPushButton('Remove')
-        self.tableView = QTableView()
-        self.status_label = QLabel('Disconnected')
+        self.mavlink = MavMonitor()
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowFlag(Qt.WindowStaysOnTopHint)
-        self.setWindowTitle('Maximum Roverdrive')
+        super(MaximumRoverdrive, self).__init_ui__()
         self.con_text.addItems(self.cfg.ports)
-        self.con_text.setEditable(True)
-        self.con_text.lineEdit().returnPressed.connect(self.mav_connect)
-        self.con_button.clicked.connect(self.mav_connect)
-        self.add_button.clicked.connect(self.add_msg)
-        self.remove_button.clicked.connect(self.remove_selected_msg)
-        self.layout.addWidget(self.con_text)
-        self.layout.addWidget(self.con_button)
-        self.layout.addWidget(self.add_button)
-        self.layout.addWidget(self.remove_button)
-        self.tableView.horizontalHeader().setStretchLastSection(True)
-        self.tableView.horizontalHeader().hide()
-        self.tableView.verticalHeader().hide()
-        self.layout.addWidget(self.tableView)
-        self.layout.addWidget(self.status_label)
-        self.setLayout(self.layout)
+        self.statusBar().showMessage('Disconnected')
+
+
+    @pyqtSlot()
+    def refresh_msg_select(self):
+        if self.mavlink.messages:
+            self.msg_select_cb.clear()
+            sorted_msgs = sorted(self.mavlink.messages)
+            self.msg_select_cb.addItems(sorted_msgs)
+
+    @pyqtSlot()
+    def refresh_attr_select(self):
+        if self.mavlink.messages:
+            msg = self.msg_select_cb.currentText()
+            if len(msg) > 0:
+                self.attr_select_cb.clear()
+                self.attr_select_cb.addItems(self.mavlink.messages[msg].keys())
+
+    @pyqtSlot()
+    def update_add_button(self):
+        self.add_button.setText('Add ' + self.msg_select_cb.currentText() + '.' + self.attr_select_cb.currentText())
 
     @pyqtSlot()
     def add_msg(self):
-        msg = 'MISSION_CURRENT'
-        attr = 'seq'
-        if msg + '.' + attr not in self.cfg.messages.keys():
-            self.monitor.add_msg(msg, attr, 1.0, 15.0, 69.0)
-            self.cfg.add_msg(msg, attr, 1.0, 15.0, 69.0)
-        msg = 'NAV_CONTROLLER_OUTPUT'
-        attr = 'nav_bearing'
-        if msg + '.' + attr not in self.cfg.messages.keys():
-            self.monitor.add_msg(msg, attr, 1.0, 15.0, 69.0)
-            self.cfg.add_msg(msg, attr, 1.0, 15.0, 69.0)
-        # TODO: update config file sections
-        # TODO: select from a list of available messages
+        msg = self.msg_select_cb.currentText()
+        attr = self.attr_select_cb.currentText()
+        try:
+            multiplier = float(self.multiplier_text.text())
+        except ValueError:
+            multiplier = 1.0
+        try:
+            low = float(self.low_text.text())
+        except ValueError:
+            low = float_info.max * -1.0
+        try:
+            high = float(self.high_text.text())
+        except ValueError:
+            high = float_info.max
+        self.cfg.add_msg(msg, attr, multiplier, low, high)
+        self.mavlink.add_msg(msg, attr, multiplier, low, high)
+        self.multiplier_text.setText(str(multiplier))
+        self.low_text.setText(str(low))
+        self.high_text.setText(str(high))
 
     @pyqtSlot()
     def remove_selected_msg(self):
-        self.monitor.remove_selected()
-        # TODO: update config file sections
+        row = self.tableView.selectedIndexes()[0].row()
+        index = self.tableView.model().index(row, 0)
+        msg = self.tableView.model().data(index)
+        msg_split = msg.split('.')
+        try:
+            self.cfg.del_msg(msg_split[0], msg_split[1])
+        except IndexError:
+            pass
+        self.mavlink.remove_selected()
 
     @pyqtSlot()
     def mav_connect(self):
         if self.con_button.text() == 'Connect':
             self.cfg.add_port(self.con_text.currentText())
-            self.monitor = MavMonitor(self.con_text.currentText(), self.tableView, self.cfg.messages)
-            self.status_label.setText('Awaiting heartbeat...')
-            self.monitor.connection.wait_heartbeat()
-            self.status_label.setText('Connected -- SYSTEM: {s}  //  COMPONENT: {c}'.format(
-                s=self.monitor.connection.target_system, c=self.monitor.connection.target_component + 1))
+            self.mavlink = MavMonitor(self.con_text.currentText(), self.tableView, self.cfg.messages)
+            self.statusBar().showMessage('Awaiting heartbeat...')
+            self.mavlink.connection.wait_heartbeat()
+            self.statusBar().showMessage('Connected -- SYSTEM: {s}  //  COMPONENT: {c}'.format(
+                s=self.mavlink.connection.target_system, c=self.mavlink.connection.target_component + 1))
             self.con_button.setText('Disconnect')
             self.con_text.setEnabled(False)
-            self.monitor.start_updates()
+            self.mavlink.start_updates()
         else:
             self.mav_disconnect()
 
@@ -86,15 +98,21 @@ class MainWindow(QWidget):
             self.mav_disconnect()
 
     def mav_disconnect(self):
-        self.monitor.disconnect()
+        self.mavlink.disconnect()
         self.con_button.setText('Connect')
         self.con_text.setEnabled(True)
-        self.status_label.setText('Disconnected')
+        self.statusBar().showMessage('Disconnected')
+
+
+# force PyQt5 to provide traceback messages for debugging
+def except_hook(cls, exception, traceback):
+    sys.__excepthook__(cls, exception, traceback)
 
 
 def main():
+    sys.excepthook = except_hook
     app = QAppMPLookAndFeel(argv)
-    window = MainWindow()
+    window = MaximumRoverdrive()
     window.show()
     app.exec()
 
