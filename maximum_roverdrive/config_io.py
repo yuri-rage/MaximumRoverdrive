@@ -7,13 +7,13 @@ class ConfigIO:
     _usage_str = '# MAV.ini for MaximumRoverdrive\n\n'\
                   '# ports:\n'\
                   '#     network: [protocol:]address[:port] (e.g., tcp:localhost:5760 or udp:127.0.0.1:14550)\n'\
-                  '#     serial : port (e.g., com14 or /dev/ttyUSB0)\n\n'\
+                  '#     serial : <port>                    (e.g., com14 or /dev/ttyUSB0)\n\n'\
                   '# messages:\n'\
-                  '#     each section specifies a message to monitor\n'\
-                  '#     the format is [MESSAGE.attribute] (e.g., [VFR_HUD.yaw] or [GPS_RAW_INT.fix_type])\n'\
+                  '#     each section specifies a MAVLink message to monitor\n'\
+                  '#     the format is [MESSAGE.attribute]  (e.g., [VFR_HUD.yaw] or [GPS_RAW_INT.fix_type])\n\n'\
                   '#     options are indeed optional, <float> is a decimal value (e.g., 0.0 or 100.0):\n'\
                   '#         multiplier = <float>  -- displayed value will be multiplied by this value\n'\
-                  '#         low = <float>         -- low threshold - displayed value turns red below this\n'\
+                  '#         low = <float>         -- low threshold  - displayed value turns red below this\n'\
                   '#         high = <float>        -- high threshold - displayed value turns red above this'
 
     def __init__(self, filename=''):
@@ -26,7 +26,7 @@ class ConfigIO:
     def __check(self):
         if not self.parser.has_section('ports'):
             self.parser.add_section('ports')
-        # really stupid workaround for the fact that configparser won't save comments
+        # really stupid workaround because ConfigParser discards comments
         if not self.parser.has_section('usage'):
             self.parser.add_section('usage')
         self.parser.set('usage', self._usage_str, None)
@@ -67,7 +67,7 @@ class ConfigIO:
         self.save()
 
     def save(self):
-        # really stupid workaround to account for the fact that configparser doesn't keep section order
+        # really stupid workaround because ConfigParser tends to disregard section order
         ordered_sections = OrderedDict([(k, None) for k in ['usage', 'ports'] if k in self.parser._sections])
         ordered_sections.update(self.parser._sections)
         self.parser._sections = ordered_sections

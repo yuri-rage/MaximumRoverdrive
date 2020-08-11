@@ -71,6 +71,7 @@ class MavMonitor:
         if not exists:
             self._model.appendRow([msg_fullname, 'NO DATA'])
             self._tableView.resizeColumnsToContents()
+        # TODO: replace the 'NO DATA' row created when the user removes all messages
 
     def remove_selected(self):
         if self._model.rowCount() > 1:

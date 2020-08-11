@@ -4,6 +4,8 @@ from maximum_roverdrive.config_io import ConfigIO
 from maximum_roverdrive.mavmonitor import MavMonitor
 from maximum_roverdrive.qappmplookandfeel import QAppMPLookAndFeel
 from maximum_roverdrive.main_window import MainWindow
+from watchdog.observers import Observer
+from watchdog.events import PatternMatchingEventHandler
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import QAction
 
@@ -17,59 +19,77 @@ class MaximumRoverdrive(MainWindow):
         self.cfg = ConfigIO()
         self.mavlink = MavMonitor()
         self.init_ui()
+        self.ev_observer = Observer()
+        self.init_watchdog()
 
     def init_ui(self):
-        super(MaximumRoverdrive, self).__init_ui__()
-        self.con_text.addItems(self.cfg.ports)
+        super(MaximumRoverdrive, self).initialize()
+        self.combo_port.addItems(self.cfg.ports)
         self.statusBar().showMessage('Disconnected')
 
+    def init_watchdog(self):
+        ev_handler = PatternMatchingEventHandler(['*.waypoints', '*.poly'], ignore_patterns='',
+                                                 ignore_directories=True, case_sensitive=True)
+        ev_handler.on_any_event = self.on_any_file_event
+        path = 'D:\\Documents\\Mission Planner\\Missions'  # TODO: incorporate UI elements
+        self.ev_observer.schedule(ev_handler, path, recursive=False)
+        self.ev_observer.start()
+        pass
+
+    def on_any_file_event(self, event):
+        # TODO: implement on_filechange event handler
+        if event.event_type == 'deleted':
+            # we'll do something different here
+            pass
+        print(event.src_path)
 
     @pyqtSlot()
     def refresh_msg_select(self):
         if self.mavlink.messages:
-            self.msg_select_cb.clear()
+            self.combo_msg_select.clear()
             sorted_msgs = sorted(self.mavlink.messages)
-            self.msg_select_cb.addItems(sorted_msgs)
+            self.combo_msg_select.addItems(sorted_msgs)
 
     @pyqtSlot()
     def refresh_attr_select(self):
         if self.mavlink.messages:
-            msg = self.msg_select_cb.currentText()
+            msg = self.combo_msg_select.currentText()
             if len(msg) > 0:
-                self.attr_select_cb.clear()
-                self.attr_select_cb.addItems(self.mavlink.messages[msg].keys())
+                self.combo_attr_select.clear()
+                self.combo_attr_select.addItems(self.mavlink.messages[msg].keys())
 
     @pyqtSlot()
-    def update_add_button(self):
-        self.add_button.setText('Add ' + self.msg_select_cb.currentText() + '.' + self.attr_select_cb.currentText())
+    def update_button_msg_add(self):
+        self.button_msg_add.setText('Add ' + self.combo_msg_select.currentText()
+                                    + '.' + self.combo_attr_select.currentText())
 
     @pyqtSlot()
     def add_msg(self):
-        msg = self.msg_select_cb.currentText()
-        attr = self.attr_select_cb.currentText()
+        msg = self.combo_msg_select.currentText()
+        attr = self.combo_attr_select.currentText()
         try:
-            multiplier = float(self.multiplier_text.text())
+            multiplier = float(self.text_multiplier.text())
         except ValueError:
             multiplier = 1.0
         try:
-            low = float(self.low_text.text())
+            low = float(self.text_low.text())
         except ValueError:
             low = float_info.max * -1.0
         try:
-            high = float(self.high_text.text())
+            high = float(self.text_high.text())
         except ValueError:
             high = float_info.max
         self.cfg.add_msg(msg, attr, multiplier, low, high)
         self.mavlink.add_msg(msg, attr, multiplier, low, high)
-        self.multiplier_text.setText(str(multiplier))
-        self.low_text.setText(str(low))
-        self.high_text.setText(str(high))
+        self.text_multiplier.setText(str(multiplier))
+        self.text_low.setText(str(low))
+        self.text_high.setText(str(high))
 
     @pyqtSlot()
     def remove_selected_msg(self):
-        row = self.tableView.selectedIndexes()[0].row()
-        index = self.tableView.model().index(row, 0)
-        msg = self.tableView.model().data(index)
+        row = self.table_messages.selectedIndexes()[0].row()
+        index = self.table_messages.model().index(row, 0)
+        msg = self.table_messages.model().data(index)
         msg_split = msg.split('.')
         try:
             self.cfg.del_msg(msg_split[0], msg_split[1])
@@ -79,28 +99,28 @@ class MaximumRoverdrive(MainWindow):
 
     @pyqtSlot()
     def mav_connect(self):
-        if self.con_button.text() == 'Connect':
-            self.cfg.add_port(self.con_text.currentText())
-            self.mavlink = MavMonitor(self.con_text.currentText(), self.tableView, self.cfg.messages)
+        if self.button_connect.text() == 'Connect':
+            self.cfg.add_port(self.combo_port.currentText())
+            self.mavlink = MavMonitor(self.combo_port.currentText(), self.table_messages, self.cfg.messages)
             self.statusBar().showMessage('Awaiting heartbeat...')
             self.mavlink.connection.wait_heartbeat()
             self.statusBar().showMessage('Connected -- SYSTEM: {s}  //  COMPONENT: {c}'.format(
                 s=self.mavlink.connection.target_system, c=self.mavlink.connection.target_component + 1))
-            self.con_button.setText('Disconnect')
-            self.con_text.setEnabled(False)
+            self.button_connect.setText('Disconnect')
+            self.combo_port.setEnabled(False)
             self.mavlink.start_updates()
         else:
             self.mav_disconnect()
 
     @pyqtSlot(bool)
     def closeEvent(self, event):
-        if self.con_button.text() == "Disconnect":
+        if self.button_connect.text() == "Disconnect":
             self.mav_disconnect()
 
     def mav_disconnect(self):
         self.mavlink.disconnect()
-        self.con_button.setText('Connect')
-        self.con_text.setEnabled(True)
+        self.button_connect.setText('Connect')
+        self.combo_port.setEnabled(True)
         self.statusBar().showMessage('Disconnected')
 
 
@@ -115,6 +135,8 @@ def main():
     window = MaximumRoverdrive()
     window.show()
     app.exec()
+    window.ev_observer.stop()
+    window.ev_observer.join()
 
 
 if __name__ == '__main__':

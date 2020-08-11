@@ -25,6 +25,8 @@ class QAppMPLookAndFeel(QApplication):
         dark_palette.setColor(QPalette.HighlightedText, Qt.black)
         self.setPalette(dark_palette)
         self.setStyleSheet('QWidget { font-family: "Segue UI", sans-serif; font-size: 12px; }'
+                           'QFrame { border: 1px solid #515253; }'
+                           'QLabel { border: 0px }'
                            'QToolTip { color: white; background-color: #2a82da; border: 1px solid white; }'
                            'QTableView { font-family: "Consolas", fixed;  font-size: 14px; '
                            'border: 1px solid #515253; gridline-color: #515253; }'
