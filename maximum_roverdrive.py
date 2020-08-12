@@ -1,3 +1,12 @@
+"""
+    companion app to Mission Planner or other MAVLink GCS software
+    monitors user selected MAVLink messages in a GUI
+    converts between waypoint and polygon mission files
+    TODO: sends custom commands via MAVLink
+
+    -- Yuri -- Aug 2020
+ """
+
 import sys
 from sys import argv, float_info
 from os import getcwd

@@ -32,7 +32,7 @@ class ConfigIO:
         self.parser.set('usage', self._usage_str, None)
         if not self.parser.has_section('ports'):
             self.parser.add_section('ports')
-        if not self.parser.has_section('filesystem'):
+        if not self.parser.has_section('filesystem'):  # TODO: rename to preferences and add default home/altitude
             self.parser.add_section('filesystem')
         if not self.parser.has_option('filesystem', 'mission_folder'):
             self.parser.set('filesystem', 'mission_folder')
