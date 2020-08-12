@@ -1,5 +1,6 @@
 import sys
 from sys import argv, float_info
+from os import getcwd
 from maximum_roverdrive.config_io import ConfigIO
 from maximum_roverdrive.mavmonitor import MavMonitor
 from maximum_roverdrive.qappmplookandfeel import QAppMPLookAndFeel
@@ -20,18 +21,19 @@ class MaximumRoverdrive(MainWindow):
         self.mavlink = MavMonitor()
         self.init_ui()
         self.ev_observer = Observer()
-        self.init_watchdog()
+        self.init_watchdog(self.cfg.mission_folder)
 
     def init_ui(self):
-        super(MaximumRoverdrive, self).initialize()
         self.combo_port.addItems(self.cfg.ports)
         self.statusBar().showMessage('Disconnected')
+        self.initialize()
 
-    def init_watchdog(self):
-        ev_handler = PatternMatchingEventHandler(['*.waypoints', '*.poly'], ignore_patterns='',
+    def init_watchdog(self, path):
+        ev_handler = PatternMatchingEventHandler(['*.waypoints', '*.poly'], # ignore_patterns='',
                                                  ignore_directories=True, case_sensitive=True)
         ev_handler.on_any_event = self.on_any_file_event
-        path = 'D:\\Documents\\Mission Planner\\Missions'  # TODO: incorporate UI elements
+        if path is None:
+            path = getcwd()
         self.ev_observer.schedule(ev_handler, path, recursive=False)
         self.ev_observer.start()
         pass

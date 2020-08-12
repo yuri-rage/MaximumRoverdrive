@@ -7,10 +7,12 @@ class ConfigIO:
     _usage_str = '# MAV.ini for MaximumRoverdrive\n\n'\
                   '# ports:\n'\
                   '#     network: [protocol:]address[:port] (e.g., tcp:localhost:5760 or udp:127.0.0.1:14550)\n'\
-                  '#     serial : <port>                    (e.g., com14 or /dev/ttyUSB0)\n\n'\
+                  '#     serial : <port>                    (e.g., com14 or /dev/ttyUSB0)\n#\n'\
+                  '# filesystem:\n'\
+                  '#     mission_folder: <folder>           (e.g., C:\\Mission Planner\\Missions)\n#\n'\
                   '# messages:\n'\
                   '#     each section specifies a MAVLink message to monitor\n'\
-                  '#     the format is [MESSAGE.attribute]  (e.g., [VFR_HUD.yaw] or [GPS_RAW_INT.fix_type])\n\n'\
+                  '#     the format is [MESSAGE.attribute]  (e.g., [VFR_HUD.yaw] or [GPS_RAW_INT.fix_type])\n#\n'\
                   '#     options are indeed optional, <float> is a decimal value (e.g., 0.0 or 100.0):\n'\
                   '#         multiplier = <float>  -- displayed value will be multiplied by this value\n'\
                   '#         low = <float>         -- low threshold  - displayed value turns red below this\n'\
@@ -24,12 +26,16 @@ class ConfigIO:
         self.__check()
 
     def __check(self):
-        if not self.parser.has_section('ports'):
-            self.parser.add_section('ports')
         # really stupid workaround because ConfigParser discards comments
         if not self.parser.has_section('usage'):
             self.parser.add_section('usage')
         self.parser.set('usage', self._usage_str, None)
+        if not self.parser.has_section('ports'):
+            self.parser.add_section('ports')
+        if not self.parser.has_section('filesystem'):
+            self.parser.add_section('filesystem')
+        if not self.parser.has_option('filesystem', 'mission_folder'):
+            self.parser.set('filesystem', 'mission_folder')
         self.save()
 
     def __values(self, section):
@@ -68,7 +74,7 @@ class ConfigIO:
 
     def save(self):
         # really stupid workaround because ConfigParser tends to disregard section order
-        ordered_sections = OrderedDict([(k, None) for k in ['usage', 'ports'] if k in self.parser._sections])
+        ordered_sections = OrderedDict([(k, None) for k in ['usage', 'ports', 'filesystem'] if k in self.parser._sections])
         ordered_sections.update(self.parser._sections)
         self.parser._sections = ordered_sections
         f = open(self.filename, "w")
@@ -87,6 +93,7 @@ class ConfigIO:
         sections = self.parser.sections()
         sections.remove('ports')
         sections.remove('usage')
+        sections.remove('filesystem')
         for section in sections:
             try:
                 params = params._replace(multiplier=self.parser.getfloat(section, 'multiplier'))
@@ -102,3 +109,7 @@ class ConfigIO:
                 params = params._replace(high=float_info.max)
             value.update({section: params})
         return value
+
+    @property
+    def mission_folder(self):
+        return self.parser.get('filesystem', 'mission_folder')
