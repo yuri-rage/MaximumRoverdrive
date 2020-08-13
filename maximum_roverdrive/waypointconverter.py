@@ -18,9 +18,9 @@ class WaypointConverter:
         else:
             self._error = None
             self._filename = filename
-            self._home_lat = home_lat  # defaults to PHX Sky Harbor...cuz why not?
-            self._home_lng = home_lng
-            self._default_altitude = default_altitude  # defaults to 30.48m (100')
+            self._home_lat = 33.44 if home_lat is None else home_lat  # defaults to PHX Sky Harbor...cuz why not?
+            self._home_lng = -112.0 if home_lng is None else home_lng
+            self._default_altitude = 30.48 if home_lng is None else default_altitude  # defaults to 30.48m (100')
             try:
                 self._filetype = self.__read_file(self._filename)
             except FileNotFoundError:

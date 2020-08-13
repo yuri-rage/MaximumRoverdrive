@@ -32,10 +32,16 @@ class ConfigIO:
         self.parser.set('usage', self._usage_str, None)
         if not self.parser.has_section('ports'):
             self.parser.add_section('ports')
-        if not self.parser.has_section('filesystem'):  # TODO: rename to preferences and add default home/altitude
-            self.parser.add_section('filesystem')
-        if not self.parser.has_option('filesystem', 'mission_folder'):
-            self.parser.set('filesystem', 'mission_folder')
+        if not self.parser.has_section('preferences'):
+            self.parser.add_section('preferences')
+        if not self.parser.has_option('preferences', 'mission_folder'):
+            self.parser.set('preferences', 'mission_folder')
+        if not self.parser.has_option('preferences', 'home_lat'):
+            self.parser.set('preferences', 'home_lat')
+        if not self.parser.has_option('preferences', 'home_lng'):
+            self.parser.set('preferences', 'home_lng')
+        if not self.parser.has_option('preferences', 'default_altitude'):
+            self.parser.set('preferences', 'default_altitude')
         self.save()
 
     def __values(self, section):
@@ -74,7 +80,7 @@ class ConfigIO:
 
     def save(self):
         # really stupid workaround because ConfigParser tends to disregard section order
-        ordered_sections = OrderedDict([(k, None) for k in ['usage', 'ports', 'filesystem'] if k in self.parser._sections])
+        ordered_sections = OrderedDict([(k, None) for k in ['usage', 'ports', 'preferences'] if k in self.parser._sections])
         ordered_sections.update(self.parser._sections)
         self.parser._sections = ordered_sections
         f = open(self.filename, "w")
@@ -93,7 +99,7 @@ class ConfigIO:
         sections = self.parser.sections()
         sections.remove('ports')
         sections.remove('usage')
-        sections.remove('filesystem')
+        sections.remove('preferences')
         for section in sections:
             try:
                 params = params._replace(multiplier=self.parser.getfloat(section, 'multiplier'))
@@ -112,4 +118,21 @@ class ConfigIO:
 
     @property
     def mission_folder(self):
-        return self.parser.get('filesystem', 'mission_folder')
+        return self.parser.get('preferences', 'mission_folder')
+
+    @mission_folder.setter
+    def mission_folder(self, path):
+        self.parser.set('preferences', 'mission_folder', path)
+        self.save()
+
+    @property
+    def home_lat(self):
+        return self.parser.get('preferences', 'home_lat')
+
+    @property
+    def home_lng(self):
+        return self.parser.get('preferences', 'home_lng')
+
+    @property
+    def default_altitude(self):
+        return self.parser.get('preferences', 'default_altitude')

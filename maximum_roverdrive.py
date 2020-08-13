@@ -9,18 +9,20 @@
 
 import sys
 from sys import argv, float_info
-from os import getcwd
+from os import getcwd, path
 from maximum_roverdrive.config_io import ConfigIO
 from maximum_roverdrive.mavmonitor import MavMonitor
 from maximum_roverdrive.qappmplookandfeel import QAppMPLookAndFeel
 from maximum_roverdrive.main_window import MainWindow
+from maximum_roverdrive.waypointconverter import WaypointConverter
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
-from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QAction
 
 
 class MaximumRoverdrive(MainWindow):
+    mission_file_changed = pyqtSignal(str)
 
     def __init__(self):
         super(MaximumRoverdrive, self).__init__()
@@ -30,29 +32,60 @@ class MaximumRoverdrive(MainWindow):
         self.mavlink = MavMonitor()
         self.init_ui()
         self.ev_observer = Observer()
-        self.init_watchdog(self.cfg.mission_folder)
+        self.mission_folder = self.cfg.mission_folder
+        self.mission_file_changed.connect(self.update_text_mission_file)
+        self.init_watchdog()
 
     def init_ui(self):
         self.combo_port.addItems(self.cfg.ports)
         self.statusBar().showMessage('Disconnected')
         self.initialize()
 
-    def init_watchdog(self, path):
-        ev_handler = PatternMatchingEventHandler(['*.waypoints', '*.poly'], # ignore_patterns='',
-                                                 ignore_directories=True, case_sensitive=True)
+    def init_watchdog(self):
+        ev_handler = PatternMatchingEventHandler(['*.waypoints', '*.poly'], ignore_directories=True)
         ev_handler.on_any_event = self.on_any_file_event
-        if path is None:
-            path = getcwd()
-        self.ev_observer.schedule(ev_handler, path, recursive=False)
+        if self.mission_folder is None:
+            self.mission_folder = getcwd()
+        self.ev_observer.schedule(ev_handler, self.mission_folder, recursive=False)
         self.ev_observer.start()
         pass
 
-    def on_any_file_event(self, event):
-        # TODO: implement on_filechange event handler
-        if event.event_type == 'deleted':
-            # we'll do something different here
+    def kill_watchdog(self):
+        try:
+            self.ev_observer.stop()
+            self.ev_observer.join()
+            self.ev_observer = Observer()
+        except RuntimeError:
             pass
-        print(event.src_path)
+
+    def on_any_file_event(self, event):
+        self.mission_file_changed.emit(event.src_path)  # ensure that widgets are updated outside of thread
+
+    @pyqtSlot(str)
+    def update_text_mission_file(self, filename):
+        if path.exists(filename):
+            self.text_mission_file.setText(filename)
+
+    @pyqtSlot()
+    def convert_mission_file(self):
+        self.kill_watchdog()
+        filename = self.text_mission_file.toPlainText()
+        if filename is None or not path.exists(filename):
+            self.statusBar().showMessage(f'{"File" if filename == "" or filename is None else filename} not found...')
+            return
+        lat = self.cfg.home_lat
+        lng = self.cfg.home_lng
+        alt = self.cfg.default_altitude
+        result = WaypointConverter(filename, lat, lng, alt)
+        if result.error is None:
+            mission_folder = path.dirname(filename)
+            if mission_folder != self.mission_folder:
+                self.mission_folder = mission_folder
+                self.cfg.mission_folder = mission_folder
+            self.statusBar().showMessage(f'Created {path.basename(result.output_filename)}')
+        else:
+            self.statusBar().showMessage(f'Could not convert {path.basename(filename)}')
+        self.init_watchdog()
 
     @pyqtSlot()
     def refresh_msg_select(self):
@@ -123,6 +156,7 @@ class MaximumRoverdrive(MainWindow):
         else:
             self.mav_disconnect()
 
+
     @pyqtSlot(bool)
     def closeEvent(self, event):
         if self.button_connect.text() == "Disconnect":
@@ -146,8 +180,7 @@ def main():
     window = MaximumRoverdrive()
     window.show()
     app.exec()
-    window.ev_observer.stop()
-    window.ev_observer.join()
+    window.kill_watchdog()
 
 
 if __name__ == '__main__':

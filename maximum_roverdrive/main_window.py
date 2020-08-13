@@ -1,6 +1,7 @@
+from os import getcwd
 from PyQt5.QtCore import Qt, QDir
 from PyQt5.QtWidgets import QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QFormLayout, \
-    QComboBox, QPushButton, QTableView, QLineEdit, QFrame, QFileDialog
+     QComboBox, QPushButton, QTableView, QLineEdit, QTextEdit, QFrame, QFileDialog
 
 
 class MainWindow(QMainWindow):
@@ -10,31 +11,43 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super(MainWindow, self).__init__()
+
+        self.mission_folder = getcwd()
+
+        # containing widgets/layouts
         self.central_widget = QWidget()
-        self.central_layout = QHBoxLayout(self.central_widget)
+        self.central_layout = QVBoxLayout(self.central_widget)
+        self.widget_horizontal = QWidget()
+        self.layout_horizontal = QHBoxLayout(self.widget_horizontal)
 
-        # define the pymavlink widgets (left pane)
-        self.layout_mav_monitor = QVBoxLayout(self.central_widget)
-        self.combo_port = QComboBox(self.central_widget)
-        self.button_connect = QPushButton('Connect', self.central_widget)
-        self.button_msg_remove = QPushButton('Remove Selected Message', self.central_widget)
-        self.table_messages = QTableView(self.central_widget)
-        self.frame_msg_request = QFrame(self.central_widget)
-        self.form_msg_request = QFormLayout(self.central_widget)
+        # pymavlink widgets (left pane)
+        self.widget_mav_monitor = QWidget()
+        self.layout_mav_monitor = QVBoxLayout(self.widget_mav_monitor)
+        self.combo_port = QComboBox()
+        self.button_connect = QPushButton('Connect')
+        self.button_msg_remove = QPushButton('Remove Selected Message')
+        self.table_messages = QTableView()
+        self.frame_msg_request = QFrame()
+        self.form_msg_request = QFormLayout()
         self.form_msg_request.setLabelAlignment(Qt.AlignRight)
-        self.button_msg_refresh = QPushButton('  Refresh Messages  ', self.central_widget)
-        self.combo_msg_select = QComboBox(self.central_widget)
-        self.combo_attr_select = QComboBox(self.central_widget)
-        self.text_multiplier = QLineEdit('1.0', self.central_widget)
-        self.text_low = QLineEdit('0.0', self.central_widget)
-        self.text_high = QLineEdit('1000.0', self.central_widget)
-        self.button_msg_add = QPushButton('Add', self.central_widget)
+        self.button_msg_refresh = QPushButton('Refresh Messages')
+        self.combo_msg_select = QComboBox()
+        self.combo_attr_select = QComboBox()
+        self.text_multiplier = QLineEdit('1.0')
+        self.text_low = QLineEdit('0.0')
+        self.text_high = QLineEdit('1000.0')
+        self.button_msg_add = QPushButton('Add')
 
-        # define the utilities widgets (right pane)
-        self.layout_utilities = QVBoxLayout(self.central_widget)
-        self.text_mission_file = QLineEdit('Filename', self.central_widget)
-        self.button_mission_file = QPushButton('  Select File to Convert  ', self.central_widget)
-        self.button_convert_file = QPushButton('Convert File', self.central_widget)
+        # utilities widgets (right pane)
+        self.widget_utilities = QWidget()
+        self.layout_utilities = QVBoxLayout(self.widget_utilities)
+        self.button_convert_file = QPushButton('Convert File')
+
+        # file widgets at bottom of central vertical layout
+        self.frame_mission_file = QFrame()
+        self.form_mission_file = QFormLayout()
+        self.button_mission_file = QPushButton('Select Waypoint/Poly\nFile to Convert')
+        self.text_mission_file = QTextEdit()
         # TODO: finish utilities layout and functionality
 
     def __init_ui__(self):
@@ -60,8 +73,18 @@ class MainWindow(QMainWindow):
 
         # set up the utilities widget layout
         self.layout_utilities.addWidget(self.button_mission_file)
-        self.layout_utilities.addWidget(self.text_mission_file)
         self.layout_utilities.addWidget(self.button_convert_file)
+
+        # set up the filename container at the bottom of the central vertical layout
+        self.frame_mission_file.setStyleSheet('QFrame { border: 0px; }'
+                                              'QTextEdit { border: 1px solid #515253; }'
+                                              'QTextEdit:focus { border: 1px solid #53a0ed; }')
+        # self.button_mission_file.setFixedHeight(40)
+        self.button_mission_file.setContentsMargins(10, 10, 10, 10)
+        self.text_mission_file.setFixedHeight(40)
+        self.form_mission_file.addRow(self.button_mission_file, self.text_mission_file)
+        self.frame_mission_file.setLayout(self.form_mission_file)
+
         # TODO: finish utilities layout and functionality
 
     def initialize(self):  # allows for instantiating method to populate list/text items before painting
@@ -69,13 +92,20 @@ class MainWindow(QMainWindow):
         self.__init_ui__()  # populate the layouts
 
         # set up the main window
-        self.setMinimumWidth(300)
         self.setWindowFlag(Qt.WindowStaysOnTopHint)
         self.setWindowTitle('Maximum Roverdrive')
 
         # put the central widget together
-        self.central_layout.addLayout(self.layout_mav_monitor)
-        self.central_layout.addLayout(self.layout_utilities)
+        self.central_layout.setContentsMargins(5, 10, 5, 10)
+        self.layout_horizontal.setContentsMargins(0, 0, 0, 0)
+        self.layout_mav_monitor.setContentsMargins(0, 0, 0, 0)
+        self.layout_utilities.setContentsMargins(0, 0, 0, 0)
+        self.widget_mav_monitor.setMinimumWidth(350)
+        self.widget_utilities.setMinimumWidth(130)
+        self.layout_horizontal.addWidget(self.widget_mav_monitor)
+        self.layout_horizontal.addWidget(self.widget_utilities)
+        self.central_layout.addWidget(self.widget_horizontal)
+        self.central_layout.addWidget(self.frame_mission_file)
         self.setCentralWidget(self.central_widget)
 
         self.__init_connections__()  # connect the ui signals
@@ -97,14 +127,16 @@ class MainWindow(QMainWindow):
         self.button_msg_refresh.clicked.connect(self.refresh_msg_select)
         self.combo_msg_select.currentIndexChanged.connect(self.refresh_attr_select)
         self.combo_attr_select.currentIndexChanged.connect(self.update_button_msg_add)
-        self.button_mission_file.clicked.connect(self.folder_picker)  # not abstract
+        self.button_convert_file.clicked.connect(self.convert_mission_file)
+        self.button_mission_file.clicked.connect(self.mission_file_dialog)  # not abstract
         # TODO: create connections for utilities widgets
 
-    def folder_picker(self):
+    def mission_file_dialog(self):
         filename = QFileDialog.getOpenFileName(self, caption='Select Waypoint/Poly File',
-                                               filter="Mission Files (*.waypoints *.poly);;All files (*.*)",
+                                               directory=self.mission_folder,
+                                               filter='Mission Files (*.waypoints *.poly);;All files (*.*)',
                                                options=QFileDialog.DontUseNativeDialog)
-        if filename:
+        if filename != ('', ''):
             filename = QDir.toNativeSeparators(filename[0])
             self.text_mission_file.setText(filename)
             return filename
