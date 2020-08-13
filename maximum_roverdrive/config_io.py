@@ -8,8 +8,11 @@ class ConfigIO:
                   '# ports:\n'\
                   '#     network: [protocol:]address[:port] (e.g., tcp:localhost:5760 or udp:127.0.0.1:14550)\n'\
                   '#     serial : <port>                    (e.g., com14 or /dev/ttyUSB0)\n#\n'\
-                  '# filesystem:\n'\
-                  '#     mission_folder: <folder>           (e.g., C:\\Mission Planner\\Missions)\n#\n'\
+                  '# preferences:\n'\
+                  '#     mission_folder: <folder>             (e.g., C:\\Mission Planner\\Missions)\n' \
+                  '#     home_lat: <float>  -- home latitude for waypoint files   (decimal degrees)\n'\
+                  '#     home_lng: <float>  -- home longitude for waypoint files  (decimal degrees)\n'\
+                  '#     default_altitude: <float>  -- default altitude for waypoint files (meters)\n#\n'\
                   '# messages:\n'\
                   '#     each section specifies a MAVLink message to monitor\n'\
                   '#     the format is [MESSAGE.attribute]  (e.g., [VFR_HUD.yaw] or [GPS_RAW_INT.fix_type])\n#\n'\
@@ -80,7 +83,8 @@ class ConfigIO:
 
     def save(self):
         # really stupid workaround because ConfigParser tends to disregard section order
-        ordered_sections = OrderedDict([(k, None) for k in ['usage', 'ports', 'preferences'] if k in self.parser._sections])
+        ordered_sections = \
+            OrderedDict([(k, None) for k in ['usage', 'ports', 'preferences'] if k in self.parser._sections])
         ordered_sections.update(self.parser._sections)
         self.parser._sections = ordered_sections
         f = open(self.filename, "w")
