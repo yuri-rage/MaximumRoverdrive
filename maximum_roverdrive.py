@@ -156,7 +156,6 @@ class MaximumRoverdrive(MainWindow):
         else:
             self.mav_disconnect()
 
-
     @pyqtSlot(bool)
     def closeEvent(self, event):
         if self.button_connect.text() == "Disconnect":
