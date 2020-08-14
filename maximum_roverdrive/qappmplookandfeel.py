@@ -1,6 +1,8 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPalette, QColor
 from PyQt5.QtWidgets import QApplication
+# I HATE THIS - PyQt5 doesn't allow you to style a QCheckbox without importing custom images to overlay
+from maximum_roverdrive import images
 
 
 class QAppMPLookAndFeel(QApplication):
@@ -26,7 +28,9 @@ class QAppMPLookAndFeel(QApplication):
         self.setPalette(dark_palette)
         self.setStyleSheet('QWidget { font-family: "Segue UI", sans-serif; font-size: 12px; }'
                            'QFrame { border: 1px solid #515253; }'
-                           'QLabel { border: 0px }'
+                           'QLabel { border: 0px; }'
+                           'QLabel[objectName=label_about] { qproperty-alignment: AlignCenter; '
+                           'text-decoration: underline; }'
                            'QLineEdit { border: 1px solid #515253; }'
                            'QLineEdit:focus { border: 1px solid #53a0ed; }'
                            'QTextEdit { border: 1px solid #515253; }'
@@ -34,6 +38,12 @@ class QAppMPLookAndFeel(QApplication):
                            'QToolTip { color: white; background-color: #2a82da; border: 1px solid white; }'
                            'QTableView { font-family: "Consolas", fixed;  font-size: 14px; '
                            'border: 1px solid #515253; gridline-color: #515253; }'
+                           'QCheckBox:indicator:unchecked { image: url(:/images/unchecked.png); }'
+                           'QCheckBox:indicator:unchecked:hover { image: url(:/images/unchecked_hover.png); }'
+                           'QCheckBox:indicator:unchecked:pressed { image: url(:/images/unchecked_pressed.png); }'
+                           'QCheckBox:indicator:checked { image: url(:/images/checked.png); }'
+                           'QCheckBox:indicator:checked:hover { image: url(:/images/checked_hover.png); }'
+                           'QCheckBox:indicator:checked:pressed { image: url(:/images/checked_pressed.png); }'
                            'QPushButton { min-height: 21px; padding-left: 7px; padding-right: 7px; '
                            'border: 0px; border-radius: 2px; border-color: #405704; background: '
                            'qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1, stop: 0 #97c224, stop: 1 #c8df8c); }'

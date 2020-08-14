@@ -1,0 +1,11 @@
+<!DOCTYPE RCC><RCC version="1.0">
+<qresource>
+    <file>images/logo.png</file>
+    <file>images/checked.png</file>
+    <file>images/checked_hover.png</file>
+    <file>images/checked_pressed.png</file>
+    <file>images/unchecked.png</file>
+    <file>images/unchecked_hover.png</file>
+    <file>images/unchecked_pressed.png</file>
+</qresource>
+</RCC>
