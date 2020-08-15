@@ -1,14 +1,18 @@
 """
 one stop shop for a subset of mavlink messages to send or save in waypoint files
 duplicates some functionality from pymavlink, but abstracts away some ambiguity
-using the classes below as templates, it should be easy to provide access to more commands
+using the classes below as templates, it should be easy to expose more commands
 """
 from pymavlink.dialects.v10 import ardupilotmega as mavlink1
 from pymavlink.dialects.v20 import common as mavlink2
 
+
+# perhaps not the most elegant way to do things (globals), but allows use-case syntax to remain consistent
 _connection = None
 _dialect = mavlink2
 _timeout = 0.5
+
+MAV_LINK_VERSION = 2
 MODES = None
 
 
@@ -17,6 +21,7 @@ def init(mavlink_connection):
     global _dialect
     global _timeout
     global MODES
+    global MAV_LINK_VERSION
     _connection = mavlink_connection
     # TODO: determine if setting the dialect environment variable is appropriate
     MavlinkCommandLong(_dialect.MAV_CMD_REQUEST_MESSAGE,
@@ -24,6 +29,7 @@ def init(mavlink_connection):
     msg = _connection.recv_match(type='AUTOPILOT_VERSION', blocking=True, timeout=_timeout)
     if getattr(msg, 'capabilities') & _dialect.MAV_PROTOCOL_CAPABILITY_MAVLINK2 < 2:
         _dialect = mavlink1
+        MAV_LINK_VERSION = 1
     MODES = _connection.mode_mapping().keys()
 
 
@@ -138,8 +144,9 @@ class SET_HOME(MavlinkCommandLong):
     global _dialect
 
     def __init__(self, lat=None, lng=None, alt=0):
-        if lat is None:
-            lat = _connection.location().lat
-        if lng is None:
-            lng = _connection.location().lng
+        if lat is None or lng is None:
+            location = _connection.location()  # default to present location if no args passed
+            lat = location.lat
+            lng = location.lng
         super(SET_HOME, self).__init__(_dialect.MAV_CMD_DO_SET_HOME, [0, 0, 0, 0, lat, lng, alt])
+

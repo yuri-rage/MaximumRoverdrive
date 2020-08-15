@@ -10,8 +10,10 @@
 import sys
 from sys import argv, float_info
 from os import getcwd, path
+from inspect import signature, getmembers, isclass
 from maximum_roverdrive.config_io import ConfigIO
 from maximum_roverdrive.mavmonitor import MavMonitor
+from maximum_roverdrive import mav_commands
 from maximum_roverdrive.qappmplookandfeel import QAppMPLookAndFeel
 from maximum_roverdrive.main_window import MainWindow
 from maximum_roverdrive.waypointconverter import WaypointConverter
@@ -40,6 +42,23 @@ class MaximumRoverdrive(MainWindow):
         self.combo_port.addItems(self.cfg.ports)
         self.statusBar().showMessage('Disconnected')
         self.initialize()
+
+    def update_mav_commands(self):
+        if self.combo_mission_command.count() == 0:
+            self.combo_mission_command.addItems([cmd for cmd, cls in getmembers(mav_commands, isclass)])
+            # TODO: add combo .connect method here (and write the method)
+    # TODO: use the following code snippet to dynamically load combo box and argument labels for mav commands
+    # TODO: add text descriptions to mav_commands to display in main window
+    # commands = getmembers(mav_commands, isclass)
+    # command_names = [cmd for cmd, cls in getmembers(mav_commands, isclass)]
+    # print(command_names)
+    # for cmd in commands:
+    #     print(cmd)
+    # name, cmd = list(filter(lambda n: 'SET_HOME' in n, commands))[0]
+    # print(name, cmd(34, -96, 0).to_waypoint_command_string(3))
+    # sig = signature(cmd)
+    # for p in sig.parameters:
+    #     print(p.capitalize())
 
     def init_watchdog(self):
         ev_handler = PatternMatchingEventHandler(['*.waypoints', '*.poly'], ignore_directories=True)
@@ -148,8 +167,11 @@ class MaximumRoverdrive(MainWindow):
             self.mavlink = MavMonitor(self.combo_port.currentText(), self.table_messages, self.cfg.messages)
             self.statusBar().showMessage('Awaiting heartbeat...')
             self.mavlink.connection.wait_heartbeat()
-            self.statusBar().showMessage('Connected -- SYSTEM: {s}  //  COMPONENT: {c}'.format(
-                s=self.mavlink.connection.target_system, c=self.mavlink.connection.target_component + 1))
+            mav_commands.init(self.mavlink.connection)
+            self.update_mav_commands()
+            self.statusBar().showMessage(f'MAVLink {mav_commands.MAV_LINK_VERSION} -- '
+                                         f'SYSTEM: {self.mavlink.connection.target_system}  //  '
+                                         f'COMPONENT: {self.mavlink.connection.target_component + 1}')
             self.button_connect.setText('Disconnect')
             self.combo_port.setEnabled(False)
             self.mavlink.start_updates()
@@ -184,3 +206,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
