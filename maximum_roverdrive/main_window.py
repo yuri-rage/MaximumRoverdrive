@@ -258,11 +258,15 @@ class MainWindow(QMainWindow):
         msg.setWindowFlag(Qt.WindowStaysOnTopHint)
         msg.setWindowTitle('About Maximum Roverdrive')
         msg.setStandardButtons(QMessageBox.Ok)
+        msg.setTextFormat(Qt.RichText)
         msg.setStyleSheet('QMessageBox { border-image: url(:/images/logo.png); }'
                           'QLabel { width: 443px; min-width: 443px; max-width: 443px;'
                           'height: 251px; min-height: 251px; max-height: 251px; '
                           'font-family: "Copperplate Gothic Bold", sans-serif; '
                           'font-size: 20px; font-weight: 500; }')
-        msg.setText('© 2020, Yuri\n\n\n\n\n\n\n\n\n\n')
+        msg.setText('© 2020, Yuri<br>'
+                    '''<a style="font-family: 'Calibri, sans-serif'; font-size: 12px; font-weight: normal;"'''
+                    'href="https://github.com/yuri-rage/MaximumRoverdrive">View on GitHub</a>'
+                    '<br><br><br><br><br><br><br><br><br><br>')
         msg.exec()
 
