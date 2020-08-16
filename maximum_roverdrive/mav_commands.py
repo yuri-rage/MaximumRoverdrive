@@ -48,6 +48,10 @@ class MavlinkCommandLong:
             except (TypeError, IndexError):
                 pass
 
+    def description(self):
+        # TODO: fully implement this in the UI
+        return 'Send a custom MAVLink command\n\n(NOT YET FULLY IMPLEMENTED)'
+
     def to_waypoint_command_string(self, waypoint_number=0, is_home=False):
         if is_home:
             val = '0\t1\t0\t16'
@@ -83,6 +87,9 @@ class ARM(MavlinkCommandLong):
     def __init__(self):
         super(ARM, self).__init__(_dialect.MAV_CMD_COMPONENT_ARM_DISARM, [1])
 
+    def description(self):
+        return 'Arm the system\n\n(no arguments)'
+
     def send(self):
         _connection.arducopter_arm()
         return self._response()
@@ -94,6 +101,9 @@ class DISARM(MavlinkCommandLong):
 
     def __init__(self):
         super(DISARM, self).__init__(_dialect.MAV_CMD_COMPONENT_ARM_DISARM, [0])
+
+    def description(self):
+        return 'Disarm the system\n\n(no arguments)'
 
     def send(self):
         _connection.arducopter_disarm()
@@ -107,6 +117,9 @@ class REBOOT(MavlinkCommandLong):
     def __init__(self):
         super(REBOOT, self).__init__(_dialect.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN)
 
+    def description(self):
+        return 'Reboot the system\n\n(no arguments)'
+
     def send(self):
         _connection.reboot_autopilot()
         return self._response()
@@ -116,9 +129,15 @@ class SET_MODE(MavlinkCommandLong):
     global _connection
     global _dialect
 
-    def __init__(self, mode):
-        self.mode = mode if isinstance(mode, int) else _connection.mode_mapping()[mode]
-        super(SET_MODE, self).__init__(_dialect.MAV_CMD_DO_SET_MODE, [self.mode])
+    def __init__(self, mode=None):
+        try:
+            self.mode = mode if isinstance(mode, int) else _connection.mode_mapping()[mode]
+            super(SET_MODE, self).__init__(_dialect.MAV_CMD_DO_SET_MODE, [self.mode])
+        except AttributeError:
+            pass
+
+    def description(self):
+        return 'Set flight mode\n\n(arg: mode)'
 
     def send(self):
         _connection.set_mode(self.mode)
@@ -129,10 +148,13 @@ class SET_RELAY(MavlinkCommandLong):
     global _connection
     global _dialect
 
-    def __init__(self, relay, state):
+    def __init__(self, relay=None, state=None):
         super(SET_RELAY, self).__init__(_dialect.MAV_CMD_DO_SET_RELAY, [relay, state])
         self.relay = relay
         self.state = state
+
+    def description(self):
+        return 'Set relay state\n\n(args: relay, state)'
 
     def send(self):
         _connection.set_relay(self.relay, self.state)
@@ -144,9 +166,14 @@ class SET_HOME(MavlinkCommandLong):
     global _dialect
 
     def __init__(self, lat=None, lng=None, alt=0):
-        if lat is None or lng is None:
-            location = _connection.location()  # default to present location if no args passed
-            lat = location.lat
-            lng = location.lng
+        try:
+            if lat is None or lng is None:
+                location = _connection.location()  # default to present location if no args passed
+                lat = location.lat
+                lng = location.lng
+        except AttributeError:
+            pass
         super(SET_HOME, self).__init__(_dialect.MAV_CMD_DO_SET_HOME, [0, 0, 0, 0, lat, lng, alt])
 
+    def description(self):
+        return 'Set home position\n\n(args: lat, lng, alt)\n\nUse current position if blank'

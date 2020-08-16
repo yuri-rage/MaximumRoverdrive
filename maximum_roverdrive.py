@@ -32,6 +32,7 @@ class MaximumRoverdrive(MainWindow):
         finish.triggered.connect(self.closeEvent)
         self.cfg = ConfigIO()
         self.mavlink = MavMonitor()
+        self.mav_commands = getmembers(mav_commands, isclass)
         self.init_ui()
         self.ev_observer = Observer()
         self.mission_folder = self.cfg.mission_folder
@@ -42,13 +43,43 @@ class MaximumRoverdrive(MainWindow):
         self.combo_port.addItems(self.cfg.ports)
         self.statusBar().showMessage('Disconnected')
         self.initialize()
+        self.update_mav_commands(self.combo_mav_command_start)
+        self.update_mav_commands(self.combo_mav_command_end)
 
-    def update_mav_commands(self):
-        if self.combo_mission_command.count() == 0:
-            self.combo_mission_command.addItems([cmd for cmd, cls in getmembers(mav_commands, isclass)])
-            # TODO: add combo .connect method here (and write the method)
-    # TODO: use the following code snippet to dynamically load combo box and argument labels for mav commands
-    # TODO: add text descriptions to mav_commands to display in main window
+    def update_mav_commands(self, combo):
+        if combo.count() == 0:
+            combo.addItems([cmd for cmd, cls in self.mav_commands])
+
+        if combo == self.combo_mav_command_start:
+            frame = self.frame_mav_command_start
+            labels = self.labels_mav_command_start
+            texts = self.texts_mav_command_start
+        elif combo == self.combo_mav_command_end:
+            frame = self.frame_mav_command_end
+            labels = self.labels_mav_command_end
+            texts = self.texts_mav_command_end
+        else:
+            return
+
+        cls_name, cls = list(filter(lambda c: combo.currentText() in c, self.mav_commands))[0]
+        params = list(signature(cls).parameters.keys())
+        frame.setToolTip(cls().description())
+
+        if cls_name == 'MavlinkCommandLong':
+            for x in range(len(labels)):
+                labels[x].setText(f'Arg{x + 1}')
+                texts[x].setEnabled(True)
+            return
+
+        for x in range(len(labels)):
+            try:
+                labels[x].setText(params[x].capitalize())
+                texts[x].setEnabled(True)
+            except IndexError:
+                labels[x].setText('')
+                texts[x].setEnabled(False)
+
+    # TODO: actually send these commands now!
     # commands = getmembers(mav_commands, isclass)
     # command_names = [cmd for cmd, cls in getmembers(mav_commands, isclass)]
     # print(command_names)
@@ -79,6 +110,10 @@ class MaximumRoverdrive(MainWindow):
 
     def on_any_file_event(self, event):
         self.mission_file_changed.emit(event.src_path)  # ensure that widgets are updated outside of thread
+
+    @pyqtSlot()
+    def update_combo_mav_command(self):
+        self.update_mav_commands(self.sender())
 
     @pyqtSlot(str)
     def update_text_mission_file(self, filename):
@@ -168,7 +203,6 @@ class MaximumRoverdrive(MainWindow):
             self.statusBar().showMessage('Awaiting heartbeat...')
             self.mavlink.connection.wait_heartbeat()
             mav_commands.init(self.mavlink.connection)
-            self.update_mav_commands()
             self.statusBar().showMessage(f'MAVLink {mav_commands.MAV_LINK_VERSION} -- '
                                          f'SYSTEM: {self.mavlink.connection.target_system}  //  '
                                          f'COMPONENT: {self.mavlink.connection.target_component + 1}')
@@ -206,5 +240,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
