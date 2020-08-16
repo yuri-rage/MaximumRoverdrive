@@ -32,9 +32,11 @@ class TableModel(QAbstractTableModel):
                 val = float(self._data[index.row()][index.column()])
             except ValueError:
                 val = self._data[index.row()][index.column()]
-            if val == 'NO DATA':
-                return QBrush(Qt.darkMagenta)
-            elif val < self._dataParameters[msg].low or val > self._dataParameters[msg].high:
+                if val == 'NO DATA':
+                    return QBrush(Qt.darkMagenta)
+                else:
+                    return QBrush(QColor(38, 39, 40))
+            if val < self._dataParameters[msg].low or val > self._dataParameters[msg].high:  # TODO: allow this to be a string
                 return QBrush(Qt.darkRed)
             else:
                 return QBrush(QColor(38, 39, 40))

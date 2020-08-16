@@ -38,8 +38,10 @@ class MainWindow(QMainWindow):
         # monitor widgets (left tab)
         self.widget_mav_monitor = QWidget()
         self.layout_mav_monitor = QVBoxLayout(self.widget_mav_monitor)
-        self.combo_port = QComboBox()
+        self.frame_connect = QFrame()
+        self.layout_connect = QHBoxLayout(self.frame_connect)
         self.button_connect = QPushButton('Connect')
+        self.combo_port = QComboBox()
         self.widget_add_remove_buttons = QWidget()
         self.layout_add_remove_buttons = QHBoxLayout(self.widget_add_remove_buttons)
         self.button_msg_add = QPushButton('Add Message')
@@ -100,9 +102,13 @@ class MainWindow(QMainWindow):
     def __init_ui__(self):
         """ called by 'public' method self.initialize()  """
         # set up the monitor widget layout
+        self.layout_connect.setContentsMargins(0, 0, 0, 0)
+        self.frame_connect.setStyleSheet('QFrame { border: 0px; }')
         self.combo_port.setEditable(True)
-        self.layout_mav_monitor.addWidget(self.combo_port)
-        self.layout_mav_monitor.addWidget(self.button_connect)
+        self.button_connect.setMaximumWidth(85)
+        self.layout_connect.addWidget(self.combo_port)
+        self.layout_connect.addWidget(self.button_connect)
+        self.layout_mav_monitor.addWidget(self.frame_connect)
         self.table_messages.horizontalHeader().setStretchLastSection(True)
         self.table_messages.horizontalHeader().hide()
         self.table_messages.verticalHeader().hide()

@@ -12,7 +12,7 @@ _connection = None
 _dialect = mavlink2
 _timeout = 0.5
 
-MAV_LINK_VERSION = 2
+MAVLINK_VERSION = 2  # assume we have MAVlink 2 until proven otherwise
 MODES = None
 
 
@@ -21,7 +21,7 @@ def init(mavlink_connection):
     global _dialect
     global _timeout
     global MODES
-    global MAV_LINK_VERSION
+    global MAVLINK_VERSION
     _connection = mavlink_connection
     # TODO: determine if setting the dialect environment variable is appropriate
     MavlinkCommandLong(_dialect.MAV_CMD_REQUEST_MESSAGE,
@@ -29,7 +29,9 @@ def init(mavlink_connection):
     msg = _connection.recv_match(type='AUTOPILOT_VERSION', blocking=True, timeout=_timeout)
     if getattr(msg, 'capabilities') & _dialect.MAV_PROTOCOL_CAPABILITY_MAVLINK2 < 2:
         _dialect = mavlink1
-        MAV_LINK_VERSION = 1
+        MAVLINK_VERSION = 1
+    msg = _connection.recv_match(type='HEARTBEAT', blocking=True, timeout=1.0)  # heartbeat is only transmitted at 1Hz
+    MAVLINK_VERSION += getattr(msg, 'mavlink_version') / 10
     MODES = _connection.mode_mapping().keys()
 
 

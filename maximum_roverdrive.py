@@ -201,9 +201,8 @@ class MaximumRoverdrive(MainWindow):
             self.cfg.add_port(self.combo_port.currentText())
             self.mavlink = MavMonitor(self.combo_port.currentText(), self.table_messages, self.cfg.messages)
             self.statusBar().showMessage('Awaiting heartbeat...')
-            self.mavlink.connection.wait_heartbeat()
-            mav_commands.init(self.mavlink.connection)
-            self.statusBar().showMessage(f'MAVLink {mav_commands.MAV_LINK_VERSION} -- '
+            mav_commands.init(self.mavlink.connection)  # this waits for heartbeat
+            self.statusBar().showMessage(f'MAVLink {mav_commands.MAVLINK_VERSION} -- '
                                          f'SYSTEM: {self.mavlink.connection.target_system}  //  '
                                          f'COMPONENT: {self.mavlink.connection.target_component + 1}')
             self.button_connect.setText('Disconnect')
