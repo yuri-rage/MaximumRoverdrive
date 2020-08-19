@@ -4,13 +4,15 @@ Uses pymavlink to monitor selected MAVLink messages and display them in a "stick
 
 Project is in its infancy and may not ever reach a fully releasable/stable version.  I simply wanted a way to monitor certain MAVLink messages in a cleanly formatted presentation without using a CLI.  It is close to providing all desired functionality, and once achieved, development will likely cease.
 
-- [ ] Nearly done: make the UI layout less clunky
-- [ ] TODO: add mission start/end commands to WP files
-- [ ] TODO: create an interface for sending messages (like toggling relays)
-- [x] TODO: ~~finish config file IO (almost complete - need "remove" functionality)~~
-- [x] TODO: ~~allow user selectable messages (instead of test input)~~
-- [x] TODO: ~~allow user to set min/max values and multipliers for display formatting~~
-- [x] TODO: ~~more efficient MAVlink message collection~~
+- [ ] TODO: Implement automatic headlights
+- [ ] TODO: Add last command send history to preferences in MAV.ini
+- [x] DONE: ~~make the UI layout less clunky~~
+- [x] DONE: ~~add mission start/end commands to WP files~~
+- [x] DONE: ~~create an interface for sending messages (like toggling relays)~~
+- [x] DONE: ~~finish config file IO (almost complete - need "remove" functionality)~~
+- [x] DONE: ~~allow user selectable messages (instead of test input)~~
+- [x] DONE: ~~allow user to set min/max values and multipliers for display formatting~~
+- [x] DONE: ~~more efficient MAVlink message collection~~
 
 Requires: pymavlink, PyQt5, configparser, watchdog
 
