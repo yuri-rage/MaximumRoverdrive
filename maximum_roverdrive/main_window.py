@@ -5,6 +5,8 @@ from PyQt5.QtWidgets import QMainWindow, QWidget, QTabWidget, QHBoxLayout, QVBox
      QComboBox, QPushButton, QTableView, QLabel, QLineEdit, QTextEdit, QCheckBox, QFrame, QFileDialog, QMessageBox
 
 
+# TODO: add tab for message buffer display
+
 class QLabelClickable(QLabel):
     clicked = pyqtSignal()
 
@@ -13,6 +15,23 @@ class QLabelClickable(QLabel):
 
     def mousePressEvent(self, ev):
         self.clicked.emit()
+
+
+class QTextStatus(QTextEdit):
+    status_text_changed = pyqtSignal(int, str)
+
+    def __init__(self, parent=None):
+        QTextEdit.__init__(self, parent)
+
+
+class QWideComboBox(QComboBox):
+    """ auto resizes the dropdown list to contents (plus a little margin) """
+    def __init__(self, parent=None):
+        QComboBox.__init__(self, parent)
+
+    def showPopup(self):
+        self.view().setMinimumWidth(self.view().sizeHintForColumn(0) + 12)
+        QComboBox.showPopup(self)
 
 
 class MainWindow(QMainWindow):
@@ -57,7 +76,7 @@ class MainWindow(QMainWindow):
         self.text_low = QLineEdit('0.0')
         self.text_high = QLineEdit('1000.0')
 
-        # utilities widgets (right tab)
+        # utilities widgets (center tab)
         self.widget_utilities = QWidget()
         self.layout_utilities = QVBoxLayout(self.widget_utilities)
         self.frame_utilities_header = QFrame()
@@ -73,22 +92,29 @@ class MainWindow(QMainWindow):
         self.label_mav_command_start = QLabel('Command at <span style="color: #94d6a3; font-weight: bold;">'
                                               'Mission Start:</span>')
         self.combo_mav_command_start = QComboBox()
-        self.labels_mav_command_start = [QLabel()] * 7
-        self.texts_mav_command_start = [QLineEdit()] * 7
+        self.labels_mav_command_start = [QLabel()] * 8
+        self.texts_mav_command_start = [QComboBox()]
+        self.texts_mav_command_start.extend([QLineEdit()] * 7)
         self.button_mav_command_start_send = QPushButton('Send Now')
-        self.checkbox_mav_command_start = QCheckBox('After Mission Start')
-        self.checkbox_mav_command_start_all = QCheckBox('At Each Waypoint')
+        self.checkbox_mav_command_start = QCheckBox('On Mission Start')
+        self.checkbox_mav_command_start_all = QCheckBox('At Each WP')
         self.frame_mav_command_end = QFrame()
         self.frame_mav_command_end.setObjectName('mav_command_end')
         self.grid_mav_command_end = QGridLayout(self.frame_mav_command_end)
         self.label_mav_command_end = QLabel('Command at <span style="color: #ffe383; font-weight: bold;">'
                                             'Mission End:</span>')
         self.combo_mav_command_end = QComboBox()
-        self.labels_mav_command_end = [QLabel()] * 7
-        self.texts_mav_command_end = [QLineEdit()] * 7
+        self.labels_mav_command_end = [QLabel()] * 8
+        self.texts_mav_command_end = [QComboBox()]
+        self.texts_mav_command_end.extend([QLineEdit()] * 7)
         self.button_mav_command_end_send = QPushButton('Send Now')
-        self.checkbox_mav_command_end = QCheckBox('After Mission End')
-        self.checkbox_mav_command_end_all = QCheckBox('At Each Waypoint')
+        self.checkbox_mav_command_end = QCheckBox('On Mission End')
+        self.checkbox_mav_command_end_all = QCheckBox('At Each WP')
+
+        # status messages (right tab)
+        self.widget_status = QWidget()
+        self.layout_status = QVBoxLayout(self.widget_status)
+        self.text_status = QTextStatus()
 
         # file widgets at bottom of central vertical layout
         self.frame_mission_file = QFrame()
@@ -142,35 +168,40 @@ class MainWindow(QMainWindow):
 
         self.grid_mav_command_start.addWidget(self.label_mav_command_start, 0, 0, 1, 2)
         self.grid_mav_command_start.addWidget(self.combo_mav_command_start, 0, 2, 1, 2)
-        for x in range(7):
+        for x in range(8):
             self.grid_mav_command_start.setColumnStretch(x, 2)
             y = 1 if x < 4 else 3
             self.labels_mav_command_start[x] = QLabel(f'Arg{x + 1}')
             self.labels_mav_command_start[x].setObjectName('label_arg')
-            self.texts_mav_command_start[x] = QLineEdit()
+            self.texts_mav_command_start[x] = QLineEdit() if x > 0 else QWideComboBox()
             self.texts_mav_command_start[x].setObjectName('text_arg')
             self.texts_mav_command_start[x].setMinimumWidth(82)
             self.grid_mav_command_start.addWidget(self.labels_mav_command_start[x], y, x % 4)
             self.grid_mav_command_start.addWidget(self.texts_mav_command_start[x], y + 1, x % 4)
-        self.grid_mav_command_start.addWidget(self.button_mav_command_start_send, 3, 3, 2, 1)
+        self.texts_mav_command_start[0].setEditable(True)
+        self.texts_mav_command_start[0].lineEdit().setAlignment(Qt.AlignCenter)
+        self.texts_mav_command_start[0].SizeAdjustPolicy(QComboBox.AdjustToContentsOnFirstShow)
+        self.grid_mav_command_start.addWidget(self.button_mav_command_start_send, 5, 3)
         self.grid_mav_command_start.addWidget(self.checkbox_mav_command_start, 5, 0, 1, 2)
-        self.grid_mav_command_start.addWidget(self.checkbox_mav_command_start_all, 5, 2, 1, 2)
+        self.grid_mav_command_start.addWidget(self.checkbox_mav_command_start_all, 5, 2)
 
         self.grid_mav_command_end.addWidget(self.label_mav_command_end, 0, 0, 1, 2)
         self.grid_mav_command_end.addWidget(self.combo_mav_command_end, 0, 2, 1, 2)
-        for x in range(7):
+        for x in range(8):
             self.grid_mav_command_end.setColumnStretch(x, 2)
             y = 1 if x < 4 else 3
             self.labels_mav_command_end[x] = QLabel(f'Arg{x + 1}')
             self.labels_mav_command_end[x].setObjectName('label_arg')
-            self.texts_mav_command_end[x] = QLineEdit()
+            self.texts_mav_command_end[x] = QLineEdit() if x > 0 else QWideComboBox()
             self.texts_mav_command_end[x].setObjectName('text_arg')
             self.texts_mav_command_end[x].setMinimumWidth(82)
             self.grid_mav_command_end.addWidget(self.labels_mav_command_end[x], y, x % 4)
             self.grid_mav_command_end.addWidget(self.texts_mav_command_end[x], y + 1, x % 4)
-        self.grid_mav_command_end.addWidget(self.button_mav_command_end_send, 3, 3, 2, 1)
+        self.texts_mav_command_end[0].setEditable(True)
+        self.texts_mav_command_end[0].lineEdit().setAlignment(Qt.AlignCenter)
+        self.grid_mav_command_end.addWidget(self.button_mav_command_end_send, 5, 3)
         self.grid_mav_command_end.addWidget(self.checkbox_mav_command_end, 5, 0, 1, 2)
-        self.grid_mav_command_end.addWidget(self.checkbox_mav_command_end_all, 5, 2, 1, 2)
+        self.grid_mav_command_end.addWidget(self.checkbox_mav_command_end_all, 5, 2)
 
         self.layout_utilities.addWidget(self.frame_utilities_header)
         self.layout_utilities.addWidget(self.frame_mav_command_start)
@@ -192,6 +223,10 @@ class MainWindow(QMainWindow):
         self.grid_mission_file.addWidget(self.button_modify_file, 1, 2, 1, 2)
         self.grid_mission_file.setContentsMargins(5, 0, 5, 5)
 
+        # set up the status messages tab
+        self.text_status.setReadOnly(True)
+        self.layout_status.addWidget(self.text_status)
+        self.layout_status.setContentsMargins(0, 0, 0, 0)
         # TODO: finish utilities layout and functionality
 
     def initialize(self):  # allows for instantiating method to populate list/text items before painting
@@ -210,6 +245,7 @@ class MainWindow(QMainWindow):
         self.central_widget.setMinimumHeight(502)
         self.tabs.addTab(self.widget_mav_monitor, 'Monitor')
         self.tabs.addTab(self.widget_utilities, 'Utilities')
+        self.tabs.addTab(self.widget_status, 'Messages')
         self.central_layout.addWidget(self.tabs)
         self.central_layout.addWidget(self.frame_mission_file)
         self.label_about.setCursor(QCursor(Qt.PointingHandCursor))
@@ -231,13 +267,22 @@ class MainWindow(QMainWindow):
         self.button_msg_refresh.clicked.connect(self.refresh_msg_select)
         self.combo_msg_select.currentIndexChanged.connect(self.refresh_attr_select)
         self.combo_attr_select.currentIndexChanged.connect(self.update_button_msg_add)
+
+        self.button_arm.clicked.connect(self.arm)
+        self.button_disarm.clicked.connect(self.disarm)
+        self.button_mav_command_start_send.clicked.connect(self.mav_command_send)
+        self.button_mav_command_end_send.clicked.connect(self.mav_command_send)
+
         self.combo_mav_command_start.currentIndexChanged.connect(self.update_combo_mav_command)
         self.combo_mav_command_end.currentIndexChanged.connect(self.update_combo_mav_command)
         self.button_convert_file.clicked.connect(self.convert_mission_file)
+        self.button_modify_file.clicked.connect(self.modify_mission_file)
 
         # these are not abstract
-        self.button_mission_file.clicked.connect(self.mission_file_dialog)
         self.label_about.clicked.connect(self.about)
+        self.button_mission_file.clicked.connect(self.mission_file_dialog)
+
+
         # TODO: create connections for utilities widgets
 
     @pyqtSlot()

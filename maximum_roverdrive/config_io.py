@@ -9,10 +9,7 @@ class ConfigIO:
                   '#     network: [protocol:]address[:port] (e.g., tcp:localhost:5760 or udp:127.0.0.1:14550)\n'\
                   '#     serial : <port>                    (e.g., com14 or /dev/ttyUSB0)\n#\n'\
                   '# preferences:\n'\
-                  '#     mission_folder: <folder>             (e.g., C:\\Mission Planner\\Missions)\n' \
-                  '#     home_lat: <float>  -- home latitude for waypoint files   (decimal degrees)\n'\
-                  '#     home_lng: <float>  -- home longitude for waypoint files  (decimal degrees)\n'\
-                  '#     default_altitude: <float>  -- default altitude for waypoint files (meters)\n#\n'\
+                  '#     mission_folder: <folder>             (e.g., C:\\Mission Planner\\Missions)\n#\n'\
                   '# messages:\n'\
                   '#     each section specifies a MAVLink message to monitor\n'\
                   '#     the format is [MESSAGE.attribute]  (e.g., [VFR_HUD.yaw] or [GPS_RAW_INT.fix_type])\n#\n'\
@@ -39,12 +36,6 @@ class ConfigIO:
             self.parser.add_section('preferences')
         if not self.parser.has_option('preferences', 'mission_folder'):
             self.parser.set('preferences', 'mission_folder')
-        if not self.parser.has_option('preferences', 'home_lat'):
-            self.parser.set('preferences', 'home_lat')
-        if not self.parser.has_option('preferences', 'home_lng'):
-            self.parser.set('preferences', 'home_lng')
-        if not self.parser.has_option('preferences', 'default_altitude'):
-            self.parser.set('preferences', 'default_altitude')
         self.save()
 
     def __values(self, section):
@@ -129,14 +120,3 @@ class ConfigIO:
         self.parser.set('preferences', 'mission_folder', path)
         self.save()
 
-    @property
-    def home_lat(self):
-        return self.parser.get('preferences', 'home_lat')
-
-    @property
-    def home_lng(self):
-        return self.parser.get('preferences', 'home_lng')
-
-    @property
-    def default_altitude(self):
-        return self.parser.get('preferences', 'default_altitude')

@@ -2,7 +2,9 @@
     companion app to Mission Planner or other MAVLink GCS software
     monitors user selected MAVLink messages in a GUI
     converts between waypoint and polygon mission files
-    TODO: sends custom commands via MAVLink
+    sends custom commands via MAVLink
+    TODO: maybe a 3rd tab with scrolling STATUSTEXT messages?
+    TODO: send waypoint missions?  can we use MAVftp for faster transfer?
 
     -- Yuri -- Aug 2020
  """
@@ -65,19 +67,33 @@ class MaximumRoverdrive(MainWindow):
         params = list(signature(cls).parameters.keys())
         frame.setToolTip(cls().description())
 
-        if cls_name == 'MavlinkCommandLong':
-            for x in range(len(labels)):
-                labels[x].setText(f'Arg{x + 1}')
-                texts[x].setEnabled(True)
-            return
+        texts[0].clear()
+        texts[0].lineEdit().setText('')
+        if cls_name == 'SET_MODE':
+            try:
+                texts[0].addItems(list(mav_commands.MODES))
+            except TypeError:
+                pass
 
         for x in range(len(labels)):
             try:
                 labels[x].setText(params[x].capitalize())
                 texts[x].setEnabled(True)
+                if x > 0:
+                    texts[x].setText('')
             except IndexError:
                 labels[x].setText('')
                 texts[x].setEnabled(False)
+                if x > 0:
+                    texts[x].setText('')
+
+        if cls_name == 'MavlinkCommandLong':
+            texts[0].setEnabled(True)
+            texts[0].addItems(list(mav_commands.MAV_CMD_DO_LIST))
+            for x in range(1, len(labels)):
+                labels[x].setText(f'Arg{x}')
+                texts[x].setEnabled(True)
+            return
 
     # TODO: actually send these commands now!
     # commands = getmembers(mav_commands, isclass)
@@ -115,22 +131,70 @@ class MaximumRoverdrive(MainWindow):
     def update_combo_mav_command(self):
         self.update_mav_commands(self.sender())
 
+    @pyqtSlot()
+    def mav_command_send(self):
+        if self.sender() == self.button_mav_command_start_send:
+            cmd = self.combo_mav_command_start.currentText()
+            arg_texts = self.texts_mav_command_start
+        elif self.sender() == self.button_mav_command_end_send:
+            cmd = self.combo_mav_command_end.currentText()
+            arg_texts = self.texts_mav_command_end
+        else:
+            return
+        self.mav_command(cmd, arg_texts, True)
+
+    def mav_command(self, cmd, arg_texts, do_send=False):
+        args = []
+        for arg in arg_texts:
+            try:
+                if arg.text() != '':
+                    try:
+                        val = float(arg.text())
+                    except ValueError:
+                        val = arg.text()
+                    args.append(val)
+            except AttributeError:
+                if arg.lineEdit().text() != '':
+                    try:
+                        val = float(arg.lineEdit().text())
+                    except ValueError:
+                        val = arg.lineEdit().text()
+                    args.append(val)
+        name, cls = list(filter(lambda n: cmd in n, getmembers(mav_commands, isclass)))[0]
+
+        if cmd == 'MavlinkCommandLong':
+            cmd = args.pop(0)
+            cmd = getattr(mav_commands.dialect, cmd)
+            args = [cmd, args]
+
+        if do_send:
+            cls(*args).send()
+        # TODO: use this to craft file strings also - need a conditional to determine whether to send (or not...)
+        # TODO: maybe store current position to pass to SET_HOME as we get it in the monitor
+        return cls(*args).to_waypoint_command_string()
+
     @pyqtSlot(str)
     def update_text_mission_file(self, filename):
         if path.exists(filename):
             self.text_mission_file.setText(filename)
 
-    @pyqtSlot()
-    def convert_mission_file(self):
-        self.kill_watchdog()
+    @pyqtSlot(bool)
+    def convert_mission_file(self, modify=False, 
+                             cmd_start=None, cmd_start_add_all=False, cmd_end=None, cmd_end_add_all=False):
         filename = self.text_mission_file.toPlainText()
         if filename is None or not path.exists(filename):
             self.statusBar().showMessage(f'{"File" if filename == "" or filename is None else filename} not found...')
             return
-        lat = self.cfg.home_lat
-        lng = self.cfg.home_lng
-        alt = self.cfg.default_altitude
-        result = WaypointConverter(filename, lat, lng, alt)
+        self.kill_watchdog()
+        lat = self.mavlink.location.lat
+        lng = self.mavlink.location.lng
+        alt = self.mavlink.location.alt
+        if not modify:
+            result = WaypointConverter(filename, lat, lng, alt)
+        else:
+
+            result = WaypointConverter(filename, lat, lng, alt,
+                                       True, cmd_start, cmd_start_add_all, cmd_end, cmd_end_add_all)
         if result.error is None:
             mission_folder = path.dirname(filename)
             if mission_folder != self.mission_folder:
@@ -140,6 +204,22 @@ class MaximumRoverdrive(MainWindow):
         else:
             self.statusBar().showMessage(f'Could not convert {path.basename(filename)}')
         self.init_watchdog()
+
+    @pyqtSlot()
+    def modify_mission_file(self):
+        cmd_start = None
+        cmd_start_add_all = False
+        cmd_end = None
+        cmd_end_add_all = False
+        if self.checkbox_mav_command_start.isChecked() or self.checkbox_mav_command_start_all.isChecked():
+            cmd_start = self.mav_command(self.combo_mav_command_start.currentText(), self.texts_mav_command_start)
+        if self.checkbox_mav_command_start_all.isChecked():
+            cmd_start_add_all = True
+        if self.checkbox_mav_command_end.isChecked() or self.checkbox_mav_command_end_all.isChecked():
+            cmd_end = self.mav_command(self.combo_mav_command_end.currentText(), self.texts_mav_command_end)
+        if self.checkbox_mav_command_end_all.isChecked():
+            cmd_end_add_all = True
+        self.convert_mission_file(True, cmd_start, cmd_start_add_all, cmd_end, cmd_end_add_all)
 
     @pyqtSlot()
     def refresh_msg_select(self):
@@ -199,9 +279,10 @@ class MaximumRoverdrive(MainWindow):
     def mav_connect(self):
         if self.button_connect.text() == 'Connect':
             self.cfg.add_port(self.combo_port.currentText())
-            self.mavlink = MavMonitor(self.combo_port.currentText(), self.table_messages, self.cfg.messages)
+            self.mavlink = MavMonitor(self.combo_port.currentText(), self.table_messages,
+                                      self.text_status,self.cfg.messages)
             self.statusBar().showMessage('Awaiting heartbeat...')
-            mav_commands.init(self.mavlink.connection)  # this waits for heartbeat
+            mav_commands.init(self.mavlink)  # this waits for heartbeat
             self.statusBar().showMessage(f'MAVLink {mav_commands.MAVLINK_VERSION} -- '
                                          f'SYSTEM: {self.mavlink.connection.target_system}  //  '
                                          f'COMPONENT: {self.mavlink.connection.target_component + 1}')
@@ -210,6 +291,14 @@ class MaximumRoverdrive(MainWindow):
             self.mavlink.start_updates()
         else:
             self.mav_disconnect()
+
+    @pyqtSlot()
+    def arm(self):
+        mav_commands.ARM().send()
+
+    @pyqtSlot()
+    def disarm(self):
+        mav_commands.DISARM().send()
 
     @pyqtSlot(bool)
     def closeEvent(self, event):

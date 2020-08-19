@@ -12,7 +12,8 @@ class BadFileFormat(Exception):
 
 class WaypointConverter:
     """ converts files between Mission Planner waypoint and poly files """
-    def __init__(self, filename=None, home_lat=33.44, home_lng=-112.0, default_altitude=30.48):
+    def __init__(self, filename=None, home_lat=33.44, home_lng=-112.0, default_altitude=30.48,
+                 modify_existing=False, cmd_start=None, cmd_start_add_all=False, cmd_end=None, cmd_end_add_all=False):
         if filename is None:
             pass  # allow instantiation of "empty" class
         else:
@@ -21,6 +22,11 @@ class WaypointConverter:
             self._home_lat = 33.44 if home_lat is None else home_lat  # defaults to PHX Sky Harbor...cuz why not?
             self._home_lng = -112.0 if home_lng is None else home_lng
             self._default_altitude = 30.48 if home_lng is None else default_altitude  # defaults to 30.48m (100')
+            self._modify_existing = modify_existing
+            self._cmd_start = cmd_start
+            self._cmd_start_add_all = cmd_start_add_all
+            self._cmd_end = cmd_end
+            self._cmd_end_add_all = cmd_end_add_all
             try:
                 self._filetype = self.__read_file(self._filename)
             except FileNotFoundError:
@@ -29,15 +35,26 @@ class WaypointConverter:
             except BadFileFormat:
                 self._error = BadFileFormat
                 return
-            if self._filetype == Filetype.waypoint:
-                self._output_filename = self._filename.split('.')[0] + '_PY.poly'
+
+            # prevent re-converted files from repeating _PY or _PY_mod over and over in the output filename
+            self._output_filename = self._filename.split('.')[0]
+            self._output_filename = self._output_filename[:-3]\
+                if self._output_filename.endswith('_PY') else self._output_filename
+            self._output_filename = self._output_filename[:-7]\
+                if self._output_filename.endswith('_PY_mod') else self._output_filename
+
+            if self._filetype == Filetype.waypoint and self._modify_existing:
+                self._output_filename = self._output_filename + '_PY_mod.waypoints'
+                self.__modify_wp_file()
+            elif self._filetype == Filetype.waypoint:
+                self._output_filename = self._output_filename + '_PY.poly'
                 self.__make_poly_file()
             else:
-                self._output_filename = self._filename.split('.')[0] + '_PY.waypoints'
+                self._output_filename = self._output_filename + '_PY.waypoints'
                 self.__make_wp_file()
 
     def __read_file(self, filename):
-        with open(filename, "r") as f:  # TODO: debug context manager to make sure it works as expected
+        with open(filename, "r") as f:
             self._lines = f.readlines()
         if len(self._lines) < 2:  # any file worth processing needs more lines
             raise BadFileFormat
@@ -56,7 +73,7 @@ class WaypointConverter:
             line = line.split()
             try:
                 if line[3] == '16':  # command 16 is waypoint - ignore all others
-                    output_lines.append(line[8] + ' ' + line[9] + '\n')
+                    output_lines.append(f'{line[8]} {line[9]}\n')
             except IndexError:  # happens on newlines near EOF (or badly formatted lines)
                 pass
         f.writelines(output_lines)
@@ -65,22 +82,62 @@ class WaypointConverter:
     def __make_wp_file(self):
         f = open(self._output_filename, "w")
         del self._lines[0]  # eliminate comment line
-        output_lines = ['QGC WPL 110\n',  # Mission Planner writes this QGC line, so let's do so, too
-                        f'0\t1\t0\t16\t0\t0\t0\t0\t'
-                        f'{self._home_lat}\t{self._home_lng}\t0\t1\n']
+        output_line = ['0', '1', '0', '16', '0', '0', '0', '0',
+                       str(self._home_lat), str(self._home_lng), '0', '1\n']
+        output_lines = ['QGC WPL 110\n',  # QGroundControl waypoint list v110 - required line
+                        '\t'.join(output_line)]
         wp_number = 1
         for line in self._lines:
             line = line.split()
             try:
-                # formatted string looks wild, but it's just a bunch of tab delimiters
-                output_lines.append(f'{wp_number}\t0\t3\t16\t0\t0\t0\t0\t'
-                                    f'{line[0]}\t{line[1]}\t{self._default_altitude}\t1\n')
+                output_line = [str(wp_number), '0', '3', '16', '0', '0', '0', '0',
+                               line[0], line[1], str(self._default_altitude), '1\n']
+                output_lines.append('\t'.join(output_line))
                 wp_number += 1
             except IndexError:  # happens on newlines near EOF (or badly formatted lines)
                 pass
         f.writelines(output_lines)
         f.close()
-        # TODO: allow for addition of start/stop mission commands for relay control to offload Pixhawk scripts
+
+    def __modify_wp_file(self):
+        f = open(self._output_filename, "w")
+        del self._lines[0]  # eliminate comment line
+        del self._lines[0]  # eliminate home waypoint
+        output_line = ['0', '1', '0', '16', '0', '0', '0', '0',
+                       str(self._home_lat), str(self._home_lng), '0', '1\n']
+        output_line = '\t'.join(output_line)
+        output_lines = ['QGC WPL 110\n',  # QGroundControl waypoint list v110 - required line
+                        output_line]
+        wp_number = 1
+        for line in self._lines:
+            try:
+                output_line = line.split()
+                if output_line[3] == '16':
+                    output_line[0] = f'{wp_number}'
+                    output_line = '\t'.join(output_line) + '\n'
+                    output_lines.append(output_line)
+                    wp_number += 1
+                    if self._cmd_start is not None and (self._cmd_start_add_all or wp_number == 2):
+                        output_line = self._cmd_start.split()
+                        output_line[0] = f'{wp_number}'
+                        output_line = '\t'.join(output_line) + '\n'
+                        output_lines.append(output_line)
+                        wp_number += 1
+                    if self._cmd_end is not None and self._cmd_end_add_all:
+                        output_line = self._cmd_end.split()
+                        output_line[0] = f'{wp_number}'
+                        output_line = '\t'.join(output_line) + '\n'
+                        output_lines.append(output_line)
+                        wp_number += 1
+            except IndexError:  # happens on newlines near EOF (or badly formatted lines)
+                pass
+        if self._cmd_end is not None and not self._cmd_end_add_all:
+            output_line = self._cmd_end.split()
+            output_line[0] = f'{wp_number}'
+            output_line = '\t'.join(output_line) + '\n'
+            output_lines.append(output_line)
+        f.writelines(output_lines)
+        f.close()
 
     def convert(self, filename, home_lat=33.44, home_lng=-112.0, default_altitude=30.48):
         """ allow for additional file conversion without re-instantiation """
