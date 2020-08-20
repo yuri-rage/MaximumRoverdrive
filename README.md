@@ -4,7 +4,7 @@ Uses pymavlink to monitor selected MAVLink messages and display them in a "stick
 
 Project is in its infancy and may not ever reach a fully releasable/stable version.  I simply wanted a way to monitor certain MAVLink messages in a cleanly formatted presentation without using a CLI.  It is close to providing all desired functionality, and once achieved, development will likely cease.
 
-- [ ] TODO: Implement automatic headlights
+- [ ] IN PROGRESS: Implement automatic headlights
 - [ ] TODO: Add command send history to preferences in MAV.ini
 - [x] DONE: ~~make the UI layout less clunky~~
 - [x] DONE: ~~add mission start/end commands to WP files~~
