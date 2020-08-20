@@ -1,9 +1,12 @@
 from pymavlink import mavutil
-from maximum_roverdrive.tablemodel import TableModel
 from threading import Thread
 from PyQt5.QtGui import QTextCursor
+from maximum_roverdrive.tablemodel import TableModel
+from maximum_roverdrive.astral_dusk import is_dark
 
 _MAX_STATUSTEXT_MESSAGES = 256  # number of STATUSTEXT messages to display
+
+_ACK_RESULTS = ['ACCEPTED', 'TEMP_REJECTED', 'DENIED', 'UNKNOWN (bad arguments?)', 'FAILED', 'IN_PROGRESS', 'CANCELLED']
 
 
 class Location:
@@ -15,19 +18,18 @@ class Location:
 class MavMonitor:
     _location = Location()
 
-    def __init__(self, port=None, tableView=None, text_status=None, cfg_messages=None):
-        if port is None or tableView is None or text_status is None or cfg_messages is None:
+    def __init__(self, window=None, cmd_list=None):
+        if window is None or cmd_list is None:
             self._received_messages = {}
         else:
-            self._tableView = tableView
-            self._text_status_messages = text_status
-            self._text_status_messages.status_text_changed.connect(self.__update_text_status_messages)
-            self._connection = mavutil.mavlink_connection(port)
-            self._requested_messages = cfg_messages
+            self._window = window
+            self._command_list = cmd_list
+            self._window.text_status.status_text_changed.connect(self.__update_text_status_messages)
+            self._connection = mavutil.mavlink_connection(window.combo_port.currentText())
             self._received_messages = {}
-            self._tableView = tableView
             self._model = TableModel()
-            self._keepalive = False
+            self._is_headlight_on = False
+            self._keep_alive = False
             self._is_alive = False
             self.__init_table()
 
@@ -40,11 +42,11 @@ class MavMonitor:
 
     def __init_table(self):
         data = []
-        for msg in self._requested_messages:
+        for msg in self._window.cfg.messages:
             data.append([msg, 'NO DATA'])
-        self._model = TableModel(data, self._requested_messages)
-        self._tableView.setModel(self._model)
-        self._tableView.resizeColumnsToContents()
+        self._model = TableModel(data, self._window.cfg.messages)
+        self._window.table_messages.setModel(self._model)
+        self._window.table_messages.resizeColumnsToContents()
 
     def __update_table(self):
         for row in range(self._model.rowCount()):
@@ -68,11 +70,11 @@ class MavMonitor:
             prepend = f'{prepend} red;">'
         elif 1 <= severity <= 2:
             prepend = f'{prepend} orange;">'
-        cursor = QTextCursor(self._text_status_messages.document())
+        cursor = QTextCursor(self._window.text_status.document())
         cursor.setPosition(0)
-        self._text_status_messages.setTextCursor(cursor)
-        self._text_status_messages.insertHtml(f'{prepend}{msg}{append}\n')
-        if self._text_status_messages.toPlainText().count('\n') >= _MAX_STATUSTEXT_MESSAGES:
+        self._window.text_status.setTextCursor(cursor)
+        self._window.text_status.insertHtml(f'{prepend}{msg}{append}\n')
+        if self._window.text_status.toPlainText().count('\n') >= _MAX_STATUSTEXT_MESSAGES:
             cursor.movePosition(QTextCursor.End)
             cursor.select(QTextCursor.LineUnderCursor)
             cursor.removeSelectedText()
@@ -80,7 +82,7 @@ class MavMonitor:
 
     def __update_thread(self):
         self._is_alive = True
-        while self._keepalive:
+        while self._keep_alive:
             key = None
             msg_received = None
             try:
@@ -96,11 +98,35 @@ class MavMonitor:
                 self._location.lng = float(msg_received['lon']) / 10000000.0
                 self._location.alt = float(msg_received['alt']) / 1000.0
             if key == 'STATUSTEXT':  # since we're capturing all traffic, keep a status history
-                self._text_status_messages.status_text_changed.emit(int(msg_received['severity']), msg_received['text'])
+                self._window.text_status.status_text_changed.emit(int(msg_received['severity']), msg_received['text'])
+            if key == 'COMMAND_ACK':
+                try:
+                    cmd = list(filter(lambda command: command[1] == msg_received['command'], self._command_list))[0][0]
+                    cmd = cmd.replace('MAV_CMD_', '')
+                except IndexError:
+                    cmd = f'COMMAND #{msg_received["command"]}'
+                result = msg_received['result']
+                self._window.statusBar().showMessage(f'{cmd}: {_ACK_RESULTS[result]}')
+            if self._window.checkbox_auto_headlights.isChecked():
+                if is_dark(self._location.lat, self._location.lng, self._location.alt) != self._is_headlight_on:
+                    try:
+                        relay = float(self._window.text_headlight_relay.text())
+                        if is_dark(self._location.lat, self._location.lng, self._location.alt):
+                            self._connection.set_relay(relay, 0)  # TODO: allow for active high
+                                                                  # TODO: save user prefs
+                                                                  # TODO: uncheck auto headlights if relay is invalid
+                            self._window.statusBar().showMessage('Headlights: ON')
+                            self._is_headlight_on = True
+                        else:
+                            self._connection.set_relay(relay, 1)
+                            self._window.statusBar().showMessage('Headlights: OFF')
+                            self._is_headlight_on = False
+                    except ValueError:
+                        pass  # likely to happen if relay value is not a number
         self._is_alive = False
 
     def start_updates(self):
-        self._keepalive = True
+        self._keep_alive = True
         Thread(target=self.__update_thread, daemon=True).start()
 
     def add_msg(self, msg, attr, multiplier=1.0, low=0.0, high=0.0):
@@ -114,20 +140,20 @@ class MavMonitor:
                 exists = True
         if not exists:
             self._model.appendRow([msg_fullname, 'NO DATA'])
-            self._tableView.resizeColumnsToContents()
+            self._window.table_messages.resizeColumnsToContents()
         # TODO: replace the 'NO DATA' row created when the user removes all messages
 
     def remove_selected(self):
         if self._model.rowCount() > 1:
-            row = self._tableView.selectedIndexes()[0].row()
+            row = self._window.table_messages.selectedIndexes()[0].row()
             self._model.removeRow(row)
         else:  # don't remove last row
             index = self._model.index(0, 0)
             self._model.setData(index, 'NO DATA')
-        self._tableView.resizeColumnsToContents()
+        self._window.table_messages.resizeColumnsToContents()
 
     def disconnect(self):
-        self._keepalive = False
+        self._keep_alive = False
         while self._is_alive:  # wait for thread to stop
             pass
         self._connection.close()
@@ -143,7 +169,3 @@ class MavMonitor:
     @property
     def location(self):
         return self._location
-
-    @property
-    def statustext_buffer(self):
-        return self._statustext_buffer

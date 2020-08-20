@@ -11,13 +11,17 @@ from pymavlink.dialects.v20 import common as mavlink2
 # perhaps not the most elegant way to do things (globals), but allows use-case syntax to remain consistent
 _listen_for_response = False  # if another module is grabbing messages, ACKs are unreliable here
 #                               use is_listening() property to change value
+dialect = mavlink2
 _connection = None
 _location = None
-dialect = mavlink2
-_timeout = 0.5
+
+_TIMEOUT = 0.5
+_MAV_CMD_FILTER = 'MAV_CMD'
+
 
 MAVLINK_VERSION = 2  # assume we have MAVlink 2 until proven otherwise
-MAV_CMD_DO_LIST = list(filter(lambda cmd: 'MAV_CMD_DO' in cmd, [name for name, obj in getmembers(mavlink2)]))
+MAV_CMD_LIST = list(filter(lambda cmd: _MAV_CMD_FILTER in cmd[0],
+                           [[name, obj] for name, obj in getmembers(mavlink2)]))
 MODES = None
 
 
@@ -25,20 +29,22 @@ def init(mavlink):
     global _connection
     global _location
     global dialect
-    global _timeout
     global MODES
-    global MAV_CMD_DO_LIST
+    global MAV_CMD_LIST
     global MAVLINK_VERSION
+
     _connection = mavlink.connection
     _location = mavlink.location
-    # TODO: determine if setting the dialect environment variable is appropriate
     MavlinkCommandLong(dialect.MAV_CMD_REQUEST_MESSAGE,
                        [dialect.MAVLINK_MSG_ID_AUTOPILOT_VERSION]).send()
-    msg = _connection.recv_match(type='AUTOPILOT_VERSION', blocking=True, timeout=_timeout)
+    msg = _connection.recv_match(type='AUTOPILOT_VERSION', blocking=True, timeout=_TIMEOUT)
+    MAVLINK_VERSION = 2
     if getattr(msg, 'capabilities') & dialect.MAV_PROTOCOL_CAPABILITY_MAVLINK2 < 2:
         dialect = mavlink1
         MAVLINK_VERSION = 1
-        MAV_CMD_DO_LIST = list(filter(lambda cmd: 'MAV_CMD_DO' in cmd, [name for name, obj in getmembers(mavlink1)]))
+        MAV_CMD_LIST = list(filter(lambda cmd: _MAV_CMD_FILTER in cmd[0],
+                                   [[name, obj] for name, obj in getmembers(mavlink1)]))
+    # MAV_CMD_LIST.insert(0, ['MISSION_SET_CURRENT', 41])   # TODO: this was unsuccessful - how do you set current wp?
     msg = _connection.recv_match(type='HEARTBEAT', blocking=True, timeout=1.0)  # heartbeat is only transmitted at 1Hz
     MAVLINK_VERSION += getattr(msg, 'mavlink_version') / 10
     MODES = _connection.mode_mapping().keys()
@@ -46,7 +52,6 @@ def init(mavlink):
 
 class MavlinkCommandLong:
     global _connection
-    global _timeout
     global _listen_for_response
 
     def __init__(self, command=None, args=None):
@@ -86,7 +91,7 @@ class MavlinkCommandLong:
     def _response(self):
         if not self._is_listening:
             return
-        ack = _connection.recv_match(type='COMMAND_ACK', blocking=True, timeout=_timeout)
+        ack = _connection.recv_match(type='COMMAND_ACK', blocking=True, timeout=_TIMEOUT)
         try:
             if getattr(ack, 'command') == self._command and getattr(ack, 'result') == 0:
                 return True
@@ -104,8 +109,6 @@ class MavlinkCommandLong:
 
 
 class ARM(MavlinkCommandLong):
-    global _connection
-    global dialect
 
     def __init__(self):
         super(ARM, self).__init__(dialect.MAV_CMD_COMPONENT_ARM_DISARM, [1])
@@ -119,8 +122,6 @@ class ARM(MavlinkCommandLong):
 
 
 class DISARM(MavlinkCommandLong):
-    global _connection
-    global dialect
 
     def __init__(self):
         super(DISARM, self).__init__(dialect.MAV_CMD_COMPONENT_ARM_DISARM, [0])
@@ -134,8 +135,6 @@ class DISARM(MavlinkCommandLong):
 
 
 class REBOOT(MavlinkCommandLong):
-    global _connection
-    global dialect
 
     def __init__(self):
         super(REBOOT, self).__init__(dialect.MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN)
@@ -149,8 +148,6 @@ class REBOOT(MavlinkCommandLong):
 
 
 class SET_MODE(MavlinkCommandLong):
-    global _connection
-    global dialect
 
     def __init__(self, mode=None):
         try:
@@ -168,8 +165,6 @@ class SET_MODE(MavlinkCommandLong):
 
 
 class SET_RELAY(MavlinkCommandLong):
-    global _connection
-    global dialect
 
     def __init__(self, relay=None, state=None):
         super(SET_RELAY, self).__init__(dialect.MAV_CMD_DO_SET_RELAY, [relay, state])
@@ -185,8 +180,6 @@ class SET_RELAY(MavlinkCommandLong):
 
 
 class SET_HOME(MavlinkCommandLong):
-    global _connection
-    global dialect
 
     def __init__(self, lat=None, lng=None, alt=0):
         try:

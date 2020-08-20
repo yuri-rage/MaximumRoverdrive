@@ -5,7 +5,8 @@ from PyQt5.QtWidgets import QMainWindow, QWidget, QTabWidget, QHBoxLayout, QVBox
      QComboBox, QPushButton, QTableView, QLabel, QLineEdit, QTextEdit, QCheckBox, QFrame, QFileDialog, QMessageBox
 
 
-# TODO: add tab for message buffer display
+# TODO: implement auto headlights
+# TODO: stack ARM/DISARM buttons and add active high/low relay checkmark
 
 class QLabelClickable(QLabel):
     clicked = pyqtSignal()
@@ -123,7 +124,6 @@ class MainWindow(QMainWindow):
         self.text_mission_file = QTextEdit()
         self.button_convert_file = QPushButton('Convert File')
         self.button_modify_file = QPushButton('Modify File')
-        # TODO: finish utilities layout and functionality
 
     def __init_ui__(self):
         """ called by 'public' method self.initialize()  """
@@ -227,7 +227,6 @@ class MainWindow(QMainWindow):
         self.text_status.setReadOnly(True)
         self.layout_status.addWidget(self.text_status)
         self.layout_status.setContentsMargins(0, 0, 0, 0)
-        # TODO: finish utilities layout and functionality
 
     def initialize(self):  # allows for instantiating method to populate list/text items before painting
         """ must be called after class instantiation for window to be displayed """
@@ -253,7 +252,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
 
         self.__init_connections__()  # connect the ui signals
-        # TODO: finish layout design/tweaks
 
     def __init_connections__(self):
         """
@@ -281,9 +279,6 @@ class MainWindow(QMainWindow):
         # these are not abstract
         self.label_about.clicked.connect(self.about)
         self.button_mission_file.clicked.connect(self.mission_file_dialog)
-
-
-        # TODO: create connections for utilities widgets
 
     @pyqtSlot()
     def mission_file_dialog(self):
@@ -314,4 +309,3 @@ class MainWindow(QMainWindow):
                     'href="https://github.com/yuri-rage/MaximumRoverdrive">View on GitHub</a>'
                     '<br><br><br><br><br><br><br><br><br><br>')
         msg.exec()
-

@@ -89,7 +89,7 @@ class MaximumRoverdrive(MainWindow):
 
         if cls_name == 'MavlinkCommandLong':
             texts[0].setEnabled(True)
-            texts[0].addItems(list(mav_commands.MAV_CMD_DO_LIST))
+            texts[0].addItems([cmd for cmd, val in mav_commands.MAV_CMD_LIST])
             for x in range(1, len(labels)):
                 labels[x].setText(f'Arg{x}')
                 texts[x].setEnabled(True)
@@ -160,11 +160,11 @@ class MaximumRoverdrive(MainWindow):
                     except ValueError:
                         val = arg.lineEdit().text()
                     args.append(val)
-        name, cls = list(filter(lambda n: cmd in n, getmembers(mav_commands, isclass)))[0]
+        cls = list(filter(lambda command: cmd in command, getmembers(mav_commands, isclass)))[0][1]
 
         if cmd == 'MavlinkCommandLong':
             cmd = args.pop(0)
-            cmd = getattr(mav_commands.dialect, cmd)
+            cmd = list(filter(lambda command: command[0] == cmd, mav_commands.MAV_CMD_LIST))[0][1]
             args = [cmd, args]
 
         if do_send:
@@ -279,13 +279,12 @@ class MaximumRoverdrive(MainWindow):
     def mav_connect(self):
         if self.button_connect.text() == 'Connect':
             self.cfg.add_port(self.combo_port.currentText())
-            self.mavlink = MavMonitor(self.combo_port.currentText(), self.table_messages,
-                                      self.text_status,self.cfg.messages)
+            self.mavlink = MavMonitor(self, mav_commands.MAV_CMD_LIST)
             self.statusBar().showMessage('Awaiting heartbeat...')
             mav_commands.init(self.mavlink)  # this waits for heartbeat
             self.statusBar().showMessage(f'MAVLink {mav_commands.MAVLINK_VERSION} -- '
                                          f'SYSTEM: {self.mavlink.connection.target_system}  //  '
-                                         f'COMPONENT: {self.mavlink.connection.target_component + 1}')
+                                         f'COMPONENT: {self.mavlink.connection.target_component}')
             self.button_connect.setText('Disconnect')
             self.combo_port.setEnabled(False)
             self.mavlink.start_updates()

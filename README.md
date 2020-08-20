@@ -14,7 +14,7 @@ Project is in its infancy and may not ever reach a fully releasable/stable versi
 - [x] DONE: ~~allow user to set min/max values and multipliers for display formatting~~
 - [x] DONE: ~~more efficient MAVlink message collection~~
 
-Requires: pymavlink, PyQt5, configparser, watchdog
+Requires: pymavlink, PyQt5, configparser, watchdog, astral
 
 _Should_ be cross-platform compatible, however only tested on Windows 10 in a Python 3.7 environment.
 
