@@ -3,7 +3,7 @@
     monitors user selected MAVLink messages in a GUI
     converts between waypoint and polygon mission files
     sends custom commands via MAVLink
-    TODO: maybe a 3rd tab with scrolling STATUSTEXT messages?
+    scrolls all received GCS messages by color coded severity
     TODO: send waypoint missions?  can we use MAVftp for faster transfer?
 
     -- Yuri -- Aug 2020
@@ -17,7 +17,7 @@ from maximum_roverdrive.config_io import ConfigIO
 from maximum_roverdrive.mavmonitor import MavMonitor
 from maximum_roverdrive import mav_commands
 from maximum_roverdrive.qappmplookandfeel import QAppMPLookAndFeel
-from maximum_roverdrive.main_window import MainWindow
+from maximum_roverdrive.main_window import MainWindow, QWideComboBox
 from maximum_roverdrive.waypointconverter import WaypointConverter
 from watchdog.observers import Observer
 from watchdog.events import PatternMatchingEventHandler
@@ -45,21 +45,32 @@ class MaximumRoverdrive(MainWindow):
         self.combo_port.addItems(self.cfg.ports)
         self.statusBar().showMessage('Disconnected')
         self.initialize()
-        self.update_mav_commands(self.combo_mav_command_start)
-        self.update_mav_commands(self.combo_mav_command_end)
+        self.checkbox_relay_active_low.setChecked(not bool(self.cfg.relay_active_state))
+        self.checkbox_auto_headlights.setChecked(bool(self.cfg.auto_headlights))
+        self.combo_headlight_relay.lineEdit().setText(str(self.cfg.headlight_relay))
+        commands = [cmd for cmd, cls in self.mav_commands]
+        self.combo_mav_command_start.addItems(commands)
+        self.combo_mav_command_end.addItems(commands)
+        self.combo_mav_command_start.setCurrentText(
+            self.cfg.get_most_recent('wp_start_preferences'))
+        self.combo_mav_command_end.setCurrentText(
+            self.cfg.get_most_recent('wp_end_preferences'))
 
     def update_mav_commands(self, combo):
-        if combo.count() == 0:
-            combo.addItems([cmd for cmd, cls in self.mav_commands])
-
         if combo == self.combo_mav_command_start:
             frame = self.frame_mav_command_start
             labels = self.labels_mav_command_start
             texts = self.texts_mav_command_start
+            values = self.cfg.get_wp_preference('wp_start_preferences', combo.currentText()).split(',')
+            self.checkbox_mav_command_start.setChecked(bool(int(values[8])))
+            self.checkbox_mav_command_start_all.setChecked(bool(int(values[9])))
         elif combo == self.combo_mav_command_end:
             frame = self.frame_mav_command_end
             labels = self.labels_mav_command_end
             texts = self.texts_mav_command_end
+            values = self.cfg.get_wp_preference('wp_end_preferences', combo.currentText()).split(',')
+            self.checkbox_mav_command_end.setChecked(bool(int(values[8])))
+            self.checkbox_mav_command_end_all.setChecked(bool(int(values[9])))
         else:
             return
 
@@ -68,10 +79,18 @@ class MaximumRoverdrive(MainWindow):
         frame.setToolTip(cls().description())
 
         texts[0].clear()
-        texts[0].lineEdit().setText('')
+        texts[1].clear()
+
         if cls_name == 'SET_MODE':
             try:
                 texts[0].addItems(list(mav_commands.MODES))
+            except TypeError:
+                pass
+
+        if cls_name == 'SET_RELAY':
+            try:
+                texts[0].addItems([str(x) for x in range(7)])
+                texts[1].addItems(['ON', 'OFF'])
             except TypeError:
                 pass
 
@@ -79,33 +98,25 @@ class MaximumRoverdrive(MainWindow):
             try:
                 labels[x].setText(params[x].capitalize())
                 texts[x].setEnabled(True)
-                if x > 0:
-                    texts[x].setText('')
+                if isinstance(texts[x], QWideComboBox):
+                    texts[x].lineEdit().setText(values[x])
+                else:
+                    texts[x].setText(values[x])
             except IndexError:
                 labels[x].setText('')
                 texts[x].setEnabled(False)
-                if x > 0:
-                    texts[x].setText('')
+                if isinstance(texts[x], QWideComboBox):
+                    texts[x].lineEdit().setText(values[x])
+                else:
+                    texts[x].setText(values[x])
 
         if cls_name == 'MavlinkCommandLong':
             texts[0].setEnabled(True)
             texts[0].addItems([cmd for cmd, val in mav_commands.MAV_CMD_LIST])
+            texts[0].lineEdit().setText(values[0])
             for x in range(1, len(labels)):
                 labels[x].setText(f'Arg{x}')
                 texts[x].setEnabled(True)
-            return
-
-    # TODO: actually send these commands now!
-    # commands = getmembers(mav_commands, isclass)
-    # command_names = [cmd for cmd, cls in getmembers(mav_commands, isclass)]
-    # print(command_names)
-    # for cmd in commands:
-    #     print(cmd)
-    # name, cmd = list(filter(lambda n: 'SET_HOME' in n, commands))[0]
-    # print(name, cmd(34, -96, 0).to_waypoint_command_string(3))
-    # sig = signature(cmd)
-    # for p in sig.parameters:
-    #     print(p.capitalize())
 
     def init_watchdog(self):
         ev_handler = PatternMatchingEventHandler(['*.waypoints', '*.poly'], ignore_directories=True)
@@ -136,30 +147,33 @@ class MaximumRoverdrive(MainWindow):
         if self.sender() == self.button_mav_command_start_send:
             cmd = self.combo_mav_command_start.currentText()
             arg_texts = self.texts_mav_command_start
+            self.save_wp_command_preference('wp_start_preferences')
         elif self.sender() == self.button_mav_command_end_send:
             cmd = self.combo_mav_command_end.currentText()
             arg_texts = self.texts_mav_command_end
+            self.save_wp_command_preference('wp_end_preferences')
         else:
             return
         self.mav_command(cmd, arg_texts, True)
 
     def mav_command(self, cmd, arg_texts, do_send=False):
         args = []
+        on = 0 if self.checkbox_relay_active_low.isChecked() else 1
         for arg in arg_texts:
-            try:
-                if arg.text() != '':
-                    try:
-                        val = float(arg.text())
-                    except ValueError:
-                        val = arg.text()
-                    args.append(val)
-            except AttributeError:
-                if arg.lineEdit().text() != '':
-                    try:
-                        val = float(arg.lineEdit().text())
-                    except ValueError:
-                        val = arg.lineEdit().text()
-                    args.append(val)
+            if isinstance(arg, QWideComboBox):
+                val = arg.lineEdit().text()
+            else:
+                val = arg.text()
+            if val != '':
+                try:
+                    val = float(val)
+                except ValueError:  # it's a string that doesn't convert to a float
+                    if val == 'ON':
+                        val = on
+                    elif val == 'OFF':
+                        val = on ^ 1
+                args.append(val)
+
         cls = list(filter(lambda command: cmd in command, getmembers(mav_commands, isclass)))[0][1]
 
         if cmd == 'MavlinkCommandLong':
@@ -169,8 +183,6 @@ class MaximumRoverdrive(MainWindow):
 
         if do_send:
             cls(*args).send()
-        # TODO: use this to craft file strings also - need a conditional to determine whether to send (or not...)
-        # TODO: maybe store current position to pass to SET_HOME as we get it in the monitor
         return cls(*args).to_waypoint_command_string()
 
     @pyqtSlot(str)
@@ -179,7 +191,7 @@ class MaximumRoverdrive(MainWindow):
             self.text_mission_file.setText(filename)
 
     @pyqtSlot(bool)
-    def convert_mission_file(self, modify=False, 
+    def convert_mission_file(self, modify=False,
                              cmd_start=None, cmd_start_add_all=False, cmd_end=None, cmd_end_add_all=False):
         filename = self.text_mission_file.toPlainText()
         if filename is None or not path.exists(filename):
@@ -213,10 +225,12 @@ class MaximumRoverdrive(MainWindow):
         cmd_end_add_all = False
         if self.checkbox_mav_command_start.isChecked() or self.checkbox_mav_command_start_all.isChecked():
             cmd_start = self.mav_command(self.combo_mav_command_start.currentText(), self.texts_mav_command_start)
+            self.save_wp_command_preference('wp_start_preferences')
         if self.checkbox_mav_command_start_all.isChecked():
             cmd_start_add_all = True
         if self.checkbox_mav_command_end.isChecked() or self.checkbox_mav_command_end_all.isChecked():
             cmd_end = self.mav_command(self.combo_mav_command_end.currentText(), self.texts_mav_command_end)
+            self.save_wp_command_preference('wp_end_preferences')
         if self.checkbox_mav_command_end_all.isChecked():
             cmd_end_add_all = True
         self.convert_mission_file(True, cmd_start, cmd_start_add_all, cmd_end, cmd_end_add_all)
@@ -287,6 +301,10 @@ class MaximumRoverdrive(MainWindow):
                                          f'COMPONENT: {self.mavlink.connection.target_component}')
             self.button_connect.setText('Disconnect')
             self.combo_port.setEnabled(False)
+            self.button_arm.setEnabled(True)
+            self.button_disarm.setEnabled(True)
+            self.button_mav_command_start_send.setEnabled(True)
+            self.button_mav_command_end_send.setEnabled(True)
             self.mavlink.start_updates()
         else:
             self.mav_disconnect()
@@ -299,6 +317,36 @@ class MaximumRoverdrive(MainWindow):
     def disarm(self):
         mav_commands.DISARM().send()
 
+    @pyqtSlot()
+    def save_relay_state(self):
+        self.cfg.relay_active_state = str(int(not self.checkbox_relay_active_low.isChecked()))
+
+    @pyqtSlot()
+    def save_auto_headlights_state(self):
+        self.cfg.auto_headlights = str(int(self.checkbox_auto_headlights.isChecked()))
+
+    @pyqtSlot()
+    def save_headlight_relay(self):
+        self.cfg.headlight_relay = self.combo_headlight_relay.currentText()
+
+    def save_wp_command_preference(self, section):
+        start = 'start' in section
+        values = []
+        texts = self.texts_mav_command_start if start else self.texts_mav_command_end
+        cmd = self.combo_mav_command_start.currentText() if start else self.combo_mav_command_end.currentText()
+        for text in texts:
+            if isinstance(text, QWideComboBox):
+                values.append(text.lineEdit().text())
+            else:
+                values.append(text.text())
+        if start:
+            values.append(str(int(self.checkbox_mav_command_start.isChecked())))
+            values.append(str(int(self.checkbox_mav_command_start_all.isChecked())))
+        else:
+            values.append(str(int(self.checkbox_mav_command_end.isChecked())))
+            values.append(str(int(self.checkbox_mav_command_end_all.isChecked())))
+        self.cfg.save_wp_preference(section, cmd, ','.join(values))
+
     @pyqtSlot(bool)
     def closeEvent(self, event):
         if self.button_connect.text() == "Disconnect":
@@ -307,6 +355,10 @@ class MaximumRoverdrive(MainWindow):
     def mav_disconnect(self):
         self.mavlink.disconnect()
         self.button_connect.setText('Connect')
+        self.button_arm.setEnabled(False)
+        self.button_disarm.setEnabled(False)
+        self.button_mav_command_start_send.setEnabled(False)
+        self.button_mav_command_end_send.setEnabled(False)
         self.combo_port.setEnabled(True)
         self.statusBar().showMessage('Disconnected')
 

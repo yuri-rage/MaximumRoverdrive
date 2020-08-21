@@ -36,6 +36,10 @@ class ConfigIO:
             self.parser.add_section('preferences')
         if not self.parser.has_option('preferences', 'mission_folder'):
             self.parser.set('preferences', 'mission_folder')
+        if not self.parser.has_section('wp_start_preferences'):
+            self.parser.add_section('wp_start_preferences')
+        if not self.parser.has_section('wp_end_preferences'):
+            self.parser.add_section('wp_end_preferences')
         self.save()
 
     def __values(self, section):
@@ -75,7 +79,9 @@ class ConfigIO:
     def save(self):
         # really stupid workaround because ConfigParser tends to disregard section order
         ordered_sections = \
-            OrderedDict([(k, None) for k in ['usage', 'ports', 'preferences'] if k in self.parser._sections])
+            OrderedDict([(k, None) for k in
+                         ['usage', 'ports', 'preferences','wp_start_preferences', 'wp_end_preferences']
+                         if k in self.parser._sections])
         ordered_sections.update(self.parser._sections)
         self.parser._sections = ordered_sections
         f = open(self.filename, "w")
@@ -95,6 +101,8 @@ class ConfigIO:
         sections.remove('ports')
         sections.remove('usage')
         sections.remove('preferences')
+        sections.remove('wp_start_preferences')
+        sections.remove('wp_end_preferences')
         for section in sections:
             try:
                 params = params._replace(multiplier=self.parser.getfloat(section, 'multiplier'))
@@ -120,3 +128,55 @@ class ConfigIO:
         self.parser.set('preferences', 'mission_folder', path)
         self.save()
 
+    @property
+    def relay_active_state(self):
+        try:
+            return int(self.parser.get('preferences', 'relay_active_state'))
+        except NoOptionError:
+            return 0  # default to active low
+
+    @relay_active_state.setter
+    def relay_active_state(self, value):
+        self.parser.set('preferences', 'relay_active_state', value)
+        self.save()
+
+    @property
+    def auto_headlights(self):
+        try:
+            return int(self.parser.get('preferences', 'auto_headlights'))
+        except NoOptionError:
+            return 0
+
+    @auto_headlights.setter
+    def auto_headlights(self, value):
+        self.parser.set('preferences', 'auto_headlights', value)
+        self.save()
+
+    @property
+    def headlight_relay(self):
+        try:
+            return int(self.parser.get('preferences', 'headlight_relay'))
+        except NoOptionError:
+            return 0
+
+    @headlight_relay.setter
+    def headlight_relay(self, value):
+        self.parser.set('preferences', 'headlight_relay', value)
+        self.save()
+
+    def save_wp_preference(self, section, cmd, values):
+        self.parser.set(section, 'recent', cmd)
+        self.parser.set(section, cmd, values)
+        self.save()
+
+    def get_wp_preference(self, section, command):
+        try:
+            return self.parser.get(section, command)
+        except NoOptionError:
+            return ',,,,,,,,0,0'  # this section's equivalent of nothing selected
+
+    def get_most_recent(self, section):
+        try:
+            return self.parser.get(section, 'recent')
+        except NoOptionError:
+            return ''  # this section's equivalent of nothing selected

@@ -81,6 +81,8 @@ class MavMonitor:
             cursor.deletePreviousChar()
 
     def __update_thread(self):
+        """ this became a bit of spaghetti code as I tested and added features
+            if this project grows any legs, this method needs to be split into multiple sub-functions """
         self._is_alive = True
         while self._keep_alive:
             key = None
@@ -93,7 +95,7 @@ class MavMonitor:
             except AttributeError:
                 pass
             self.__update_table()
-            if key == 'GLOBAL_POSITION_INT':  # avoids the delay in the pymavlink location() method
+            if key == 'GLOBAL_POSITION_INT':  # store location to avoid the delay in the pymavlink location() method
                 self._location.lat = float(msg_received['lat']) / 10000000.0
                 self._location.lng = float(msg_received['lon']) / 10000000.0
                 self._location.alt = float(msg_received['alt']) / 1000.0
@@ -107,19 +109,18 @@ class MavMonitor:
                     cmd = f'COMMAND #{msg_received["command"]}'
                 result = msg_received['result']
                 self._window.statusBar().showMessage(f'{cmd}: {_ACK_RESULTS[result]}')
-            if self._window.checkbox_auto_headlights.isChecked():
+            if self._window.checkbox_auto_headlights.isChecked():  # now check way too often if it's dark outside
                 if is_dark(self._location.lat, self._location.lng, self._location.alt) != self._is_headlight_on:
                     try:
-                        relay = float(self._window.text_headlight_relay.text())
+                        relay = float(self._window.combo_headlight_relay.lineEdit().text())
+                        on = 0 if self._window.checkbox_relay_active_low.isChecked() else 1
                         if is_dark(self._location.lat, self._location.lng, self._location.alt):
-                            self._connection.set_relay(relay, 0)  # TODO: allow for active high
-                                                                  # TODO: save user prefs
-                                                                  # TODO: uncheck auto headlights if relay is invalid
-                            self._window.statusBar().showMessage('Headlights: ON')
+                            self._connection.set_relay(relay, on)
+                            self._window.text_status.status_text_changed.emit(5, 'Headlights: ON')
                             self._is_headlight_on = True
                         else:
-                            self._connection.set_relay(relay, 1)
-                            self._window.statusBar().showMessage('Headlights: OFF')
+                            self._connection.set_relay(relay, on ^ 1)
+                            self._window.text_status.status_text_changed.emit(5, 'Headlights: OFF')
                             self._is_headlight_on = False
                     except ValueError:
                         pass  # likely to happen if relay value is not a number

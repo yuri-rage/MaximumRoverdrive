@@ -5,9 +5,6 @@ from PyQt5.QtWidgets import QMainWindow, QWidget, QTabWidget, QHBoxLayout, QVBox
      QComboBox, QPushButton, QTableView, QLabel, QLineEdit, QTextEdit, QCheckBox, QFrame, QFileDialog, QMessageBox
 
 
-# TODO: implement auto headlights
-# TODO: stack ARM/DISARM buttons and add active high/low relay checkmark
-
 class QLabelClickable(QLabel):
     clicked = pyqtSignal()
 
@@ -86,7 +83,8 @@ class MainWindow(QMainWindow):
         self.button_disarm = QPushButton('DISARM')
         self.label_headlight_relay = QLabel('Light Relay')
         self.checkbox_auto_headlights = QCheckBox('   Enable\n Automatic\nHeadlights')
-        self.text_headlight_relay = QLineEdit()
+        self.checkbox_relay_active_low = QCheckBox('  Relays\nActive Low')
+        self.combo_headlight_relay = QComboBox()
         self.frame_mav_command_start = QFrame()
         self.frame_mav_command_start.setObjectName('mav_command_start')
         self.grid_mav_command_start = QGridLayout(self.frame_mav_command_start)
@@ -157,14 +155,22 @@ class MainWindow(QMainWindow):
         self.button_arm.setMinimumWidth(76)
         self.button_disarm.setMinimumWidth(76)
         self.grid_utilities_header.setRowStretch(1, 2)
-        self.grid_utilities_header.addWidget(self.button_arm, 0, 0, 2, 1)
-        self.grid_utilities_header.addWidget(self.button_disarm, 0, 1, 2, 1)
-        self.grid_utilities_header.setColumnMinimumWidth(2, 25)
+        self.button_arm.setEnabled(False)
+        self.button_disarm.setEnabled(False)
+        self.button_mav_command_start_send.setEnabled(False)
+        self.button_mav_command_end_send.setEnabled(False)
+        self.grid_utilities_header.addWidget(self.button_arm, 0, 0)
+        self.grid_utilities_header.addWidget(self.button_disarm, 1, 0)
+        self.grid_utilities_header.addWidget(self.checkbox_relay_active_low, 0, 2, 2, 1)
+        self.grid_utilities_header.addWidget(self.checkbox_auto_headlights, 0, 3, 2, 1)
         self.label_headlight_relay.setStyleSheet('QLabel { qproperty-alignment: AlignCenter; }')
         self.grid_utilities_header.addWidget(self.label_headlight_relay, 0, 4)
-        self.grid_utilities_header.addWidget(self.checkbox_auto_headlights, 0, 3, 2, 1)
-        self.text_headlight_relay.setStyleSheet('QLineEdit { qproperty-alignment: AlignCenter; }')
-        self.grid_utilities_header.addWidget(self.text_headlight_relay, 1, 4)
+        self.combo_headlight_relay.addItems([str(x) for x in range(7)])
+        self.combo_headlight_relay.setEditable(True)
+        self.combo_headlight_relay.lineEdit().setReadOnly(True)
+        self.combo_headlight_relay.lineEdit().setAlignment(Qt.AlignCenter)
+        self.grid_utilities_header.addWidget(self.combo_headlight_relay, 1, 4)
+        self.grid_utilities_header.setContentsMargins(5, 5, 5, 5)
 
         self.grid_mav_command_start.addWidget(self.label_mav_command_start, 0, 0, 1, 2)
         self.grid_mav_command_start.addWidget(self.combo_mav_command_start, 0, 2, 1, 2)
@@ -173,14 +179,18 @@ class MainWindow(QMainWindow):
             y = 1 if x < 4 else 3
             self.labels_mav_command_start[x] = QLabel(f'Arg{x + 1}')
             self.labels_mav_command_start[x].setObjectName('label_arg')
-            self.texts_mav_command_start[x] = QLineEdit() if x > 0 else QWideComboBox()
+            if x > 1:
+                self.texts_mav_command_start[x] = QLineEdit()
+            else:
+                self.texts_mav_command_start[x] = QWideComboBox()
+                self.texts_mav_command_start[x].setEditable(True)
+                self.texts_mav_command_start[x].lineEdit().setAlignment(Qt.AlignCenter)
+                self.texts_mav_command_start[x].SizeAdjustPolicy(QComboBox.AdjustToContentsOnFirstShow)
             self.texts_mav_command_start[x].setObjectName('text_arg')
             self.texts_mav_command_start[x].setMinimumWidth(82)
             self.grid_mav_command_start.addWidget(self.labels_mav_command_start[x], y, x % 4)
             self.grid_mav_command_start.addWidget(self.texts_mav_command_start[x], y + 1, x % 4)
-        self.texts_mav_command_start[0].setEditable(True)
-        self.texts_mav_command_start[0].lineEdit().setAlignment(Qt.AlignCenter)
-        self.texts_mav_command_start[0].SizeAdjustPolicy(QComboBox.AdjustToContentsOnFirstShow)
+
         self.grid_mav_command_start.addWidget(self.button_mav_command_start_send, 5, 3)
         self.grid_mav_command_start.addWidget(self.checkbox_mav_command_start, 5, 0, 1, 2)
         self.grid_mav_command_start.addWidget(self.checkbox_mav_command_start_all, 5, 2)
@@ -192,13 +202,16 @@ class MainWindow(QMainWindow):
             y = 1 if x < 4 else 3
             self.labels_mav_command_end[x] = QLabel(f'Arg{x + 1}')
             self.labels_mav_command_end[x].setObjectName('label_arg')
-            self.texts_mav_command_end[x] = QLineEdit() if x > 0 else QWideComboBox()
-            self.texts_mav_command_end[x].setObjectName('text_arg')
+            if x > 1:
+                self.texts_mav_command_end[x] = QLineEdit()
+            else:
+                self.texts_mav_command_end[x] = QWideComboBox()
+                self.texts_mav_command_end[x].setEditable(True)
+                self.texts_mav_command_end[x].lineEdit().setAlignment(Qt.AlignCenter)
+                self.texts_mav_command_end[x].SizeAdjustPolicy(QComboBox.AdjustToContentsOnFirstShow)
             self.texts_mav_command_end[x].setMinimumWidth(82)
             self.grid_mav_command_end.addWidget(self.labels_mav_command_end[x], y, x % 4)
             self.grid_mav_command_end.addWidget(self.texts_mav_command_end[x], y + 1, x % 4)
-        self.texts_mav_command_end[0].setEditable(True)
-        self.texts_mav_command_end[0].lineEdit().setAlignment(Qt.AlignCenter)
         self.grid_mav_command_end.addWidget(self.button_mav_command_end_send, 5, 3)
         self.grid_mav_command_end.addWidget(self.checkbox_mav_command_end, 5, 0, 1, 2)
         self.grid_mav_command_end.addWidget(self.checkbox_mav_command_end_all, 5, 2)
@@ -268,6 +281,9 @@ class MainWindow(QMainWindow):
 
         self.button_arm.clicked.connect(self.arm)
         self.button_disarm.clicked.connect(self.disarm)
+        self.checkbox_relay_active_low.clicked.connect(self.save_relay_state)
+        self.checkbox_auto_headlights.clicked.connect(self.save_auto_headlights_state)
+        self.combo_headlight_relay.currentTextChanged.connect(self.save_headlight_relay)
         self.button_mav_command_start_send.clicked.connect(self.mav_command_send)
         self.button_mav_command_end_send.clicked.connect(self.mav_command_send)
 
